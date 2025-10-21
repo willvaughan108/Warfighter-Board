@@ -92,19 +92,24 @@ let reportedFlag = false; // form-level flag synced with #reportedBtn
 const ALLOWED_ABBREV_FIELDS = ["time","vesselType","sensor","position","course","speed","trackNumber","minVesselLen","systemOrPlatform","emitterName","activityOrFunction","frequency","additionalInfo"];
 const TACREP_TYPES = ["India","Echo","AIS","Alpha","November","Golf","Other"];
 const DEFAULT_TACREP_FIELD_ORDER = {
-  Echo: ["callsign","timeHHMM","systemOrPlatform","emitterName","activityOrFunction","frequency","position","course","speed","trackNumber","minVesselLen","additionalInfo","reported"],
-  India: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo","reported"],
-  AIS: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo","reported"],
-  Alpha: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo","reported"],
-  November: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo","reported"],
-  Golf: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo","reported"],
-  Other: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo","reported"]
+  Echo: ["callsign","timeHHMM","systemOrPlatform","emitterName","activityOrFunction","frequency","position","course","speed","trackNumber","minVesselLen","additionalInfo"],
+  India: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo"],
+  AIS: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo"],
+  Alpha: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo"],
+  November: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo"],
+  Golf: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo"],
+  Other: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo"]
 };
 const TACREP_FIELD_DEFS = {
   callsign: {
     label: "Callsign",
     settingsLabel: "Callsign",
-    getValue: () => (typeof callsign === "string" ? callsign : "")
+    getValue: () => {
+      const el = document.getElementById("md_callsign");
+      const fromDom = (el && typeof el.value === "string") ? el.value.trim() : "";
+      if (fromDom) return fromDom;
+      return (typeof callsign === "string" ? callsign : "");
+    }
   },
   timeHHMM: {
     label: "Time",
@@ -172,11 +177,6 @@ const TACREP_FIELD_DEFS = {
     label: "Info",
     settingsLabel: "Additional Info",
     getValue: payload => (payload?.info || "")
-  },
-  reported: {
-    label: "Reported",
-    settingsLabel: "Reported",
-    getValue: payload => (typeof payload?.reported === "boolean" ? (payload.reported ? "REPORTED" : "UNREPORTED") : "")
   }
 };
 const TACREP_FORMAT_STORAGE_KEY = "wf_tacrep_format_v1";
@@ -1068,6 +1068,7 @@ crewDetails = readCrewDetailsFromTile();
 const mn = (document.getElementById("md_missionNumber")?.value || "").trim();
   const cs = (document.getElementById("md_callsign")?.value || "").trim();
 callsign = cs;
+refreshAllTacrepDetails();
 const bsStr = (document.getElementById("md_blockStart")?.value || "").replace(/\D/g,"").slice(0,10);
 missionNumber = mn;
 if (bsStr) {
@@ -1146,29 +1147,7 @@ el.value = v;
   // ---- Landing wiring ----
     // DMS position display: "DD:MM:SS.ssN DDD:MM:SS.ssE"
   function buildPosDisplay(p){
-    // Prefer DMS; fall back to legacy dec-min if necessary
-    function fmt(latOrLon){
-      const deg  = Number(p[latOrLon+'Deg']  ?? '');
-      const min  = Number(p[latOrLon+'Min']  ?? '');
-      const sec  = String(p[latOrLon+'Sec'] ?? '').padStart(2,'0');
-      const dsec = String(p[latOrLon+'DecSecStr'] ?? '').padStart(2,'0');
-      const hem  = (p[latOrLon+'Hem'] || '').toUpperCase();
-
-      if (Number.isFinite(deg) && Number.isFinite(min) && (sec !== 'NaN') && hem){
-        const ss = dsec ? `${sec}.${dsec}` : sec;
-        return `${String(deg)}:${String(min).padStart(2,'0')}:${ss}${hem}`;
-      }
-      // Legacy fallback if only dec-min exists
-      const decMin = p[latOrLon+'DecMinStr'];
-      if (Number.isFinite(deg) && Number.isFinite(min) && decMin && hem){
-        const frac = String(decMin);
-        return `${String(deg)}:${String(min).padStart(2,'0')}:${('00.'+frac).slice(3)}${hem}`; // approximate SS from dec-min
-      }
-      return "";
-    }
-    const lat = fmt('lat');
-    const lon = fmt('lon');
-    return (lat && lon) ? `${lat} ${lon}` : "";
+    return buildPosCompact(p);
   }
 
   document.addEventListener("DOMContentLoaded", ()=>{
@@ -1186,19 +1165,27 @@ function renderTacrepDetailsInto(item, payload) {
   details.dataset.rendering = "1";
   details.innerHTML = "";
 
+  const fallbackType = item.closest(".column")?.dataset.column || "Other";
+  const type = tacrepTypeFromCode(p?.code) || fallbackType;
+  const entries = collectTacrepFields(type, p);
+
   const append = (label, val) => {
-    if (val === undefined || val === null) return;
-    const s = (typeof val === "string") ? val.trim() : String(val);
-    if (s === "") return;
+    if (!val) return;
     const span = document.createElement("span");
     span.className = "detail";
-    span.innerHTML = `<em>${escapeHtml(label)}:</em> ${escapeHtml(s)}`;
+    span.innerHTML = `<em>${escapeHtml(label)}:</em> ${escapeHtml(val)}`;
     details.appendChild(span);
   };
 
-  const fallbackType = item.closest(".column")?.dataset.column || "Other";
-  const type = tacrepTypeFromCode(p?.code) || fallbackType;
-  collectTacrepFields(type, p).forEach(entry => append(entry.label, entry.value));
+  entries.forEach(entry => append(entry.label, entry.value));
+
+  if (entries.length) {
+    const slashLine = entries.map(entry => entry.value).join("/");
+    const span = document.createElement("span");
+    span.className = "detail detail-line";
+    span.textContent = slashLine;
+    details.appendChild(span);
+  }
 
   delete details.dataset.rendering;
 }
@@ -4869,28 +4856,58 @@ correlationCancelBtn.addEventListener("click", ()=> setSelectMode(false));
   }
   function refreshAllAbbrevBadges(){ $$(".column .item").forEach(it=>{ if(typeof it._renderAbbrev==="function") it._renderAbbrev(); }); }
 
-  function buildPosCompact(p){
-    const latD=digitsOnly(p.latDeg), latM=digitsOnly(p.latMin), lonD=digitsOnly(p.lonDeg), lonM=digitsOnly(p.lonMin);
-    if(latD===""||latM===""||!p.latHem||lonD===""||lonM===""||!p.lonHem) return "";
-    const latDStr=String(Math.trunc(Number(latD)||0)).padStart(2,"0");
-    const latMStr=String(Math.trunc(Number(latM)||0)).padStart(2,"0");
-    const lonDStr=String(Math.trunc(Number(lonD)||0)).padStart(3,"0");
-    const lonMStr=String(Math.trunc(Number(lonM)||0)).padStart(2,"0");
-    return `${latDStr}° ${latMStr}' ${p.latHem}, ${lonDStr}° ${lonMStr}' ${p.lonHem}`;
-  }
-  function buildPosDisplay(p){
-    function fmtTrip(minStr,decStr){
-      const mm=digitsOnly(minStr); const dec=digitsOnly(decStr||"");
-      const num=mm===""?0:Number(mm); const dn=dec===""?0:Number(`0.${dec}`);
-      const total=num+dn; return total.toFixed(3).padStart(6, total<10 ? "0" : "");
+  function computeDecimalMinutes(minStr, decMinStr, secStr, decSecStr){
+    const minDigits = digitsOnly(minStr);
+    if (minDigits === "") return null;
+    let base = Number(minDigits);
+    if (!Number.isFinite(base)) base = 0;
+
+    let fraction = null;
+
+    const decMinDigits = digitsOnly(decMinStr || "");
+    if (decMinDigits) {
+      fraction = Number(`0.${decMinDigits}`);
+    } else {
+      const secDigits = digitsOnly(secStr || "");
+      if (secDigits) {
+        let seconds = Number(secDigits);
+        if (!Number.isFinite(seconds)) seconds = 0;
+        const decSecDigits = digitsOnly(decSecStr || "");
+        if (decSecDigits) {
+          const decSec = Number(`0.${decSecDigits}`);
+          if (Number.isFinite(decSec)) seconds += decSec;
+        }
+        fraction = seconds / 60;
+      }
     }
-    const latD=digitsOnly(p.latDeg), latM=digitsOnly(p.latMin), lonD=digitsOnly(p.lonDeg), lonM=digitsOnly(p.lonMin);
-    if(latD===""||latM===""||!p.latHem||lonD===""||lonM===""||!p.lonHem) return "";
-    const latDStr=String(Math.trunc(Number(latD)||0)).padStart(2,"0");
-    const lonDStr=String(Math.trunc(Number(lonD)||0)).padStart(3,"0");
-    const latMStr=fmtTrip(p.latMin,p.latDecMinStr);
-    const lonMStr=fmtTrip(p.lonMin,p.lonDecMinStr);
-    return `${latDStr}° ${latMStr}' ${p.latHem}, ${lonDStr}° ${lonMStr}' ${p.lonHem}`;
+
+    const total = base + (fraction ?? 0);
+    if (!Number.isFinite(total)) return null;
+    return Number(total.toFixed(3));
+  }
+
+  function formatPosComponent(degStr, minStr, decMinStr, secStr, decSecStr, hem){
+    const degDigits = digitsOnly(degStr);
+    if (degDigits === "" || !hem) return "";
+    const hemUp = String(hem).trim().toUpperCase();
+    if (!hemUp) return "";
+
+    const minutes = computeDecimalMinutes(minStr, decMinStr, secStr, decSecStr);
+    if (minutes === null) return "";
+
+    const degVal = Math.trunc(Number(degDigits) || 0);
+    const minutesStr = minutes.toFixed(3).replace(/\.?0+$/,"");
+    return `${degVal} ${minutesStr} ${hemUp}`;
+  }
+
+  function buildPosCompact(p){
+    const lat = formatPosComponent(p.latDeg, p.latMin, p.latDecMinStr, p.latSec, p.latDecSecStr, p.latHem);
+    const lon = formatPosComponent(p.lonDeg, p.lonMin, p.lonDecMinStr, p.lonSec, p.lonDecSecStr, p.lonHem);
+    return (lat && lon) ? `${lat}, ${lon}` : "";
+  }
+
+  function buildPosDisplay(p){
+    return buildPosCompact(p);
   }
 
  // ---- Export ----
