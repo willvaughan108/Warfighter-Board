@@ -1,0 +1,30 @@
+:root { --blue:#1f3a93; --btn:#007bff; --btnH:#0056b3; --danger:#c62828; --dangerH:#8e0000; --ok:#2e7d32; --okH:#1b5e20; --mine:#2e7d32; --others:#1f3a93; --err:#d32f2f; --errbg:#fdecea; }
+
+body { font-family: Arial, sans-serif; margin: 0; background: #f5f5f5; color:#111; }
+h1 { margin: 0; padding: 24px 20px 10px; display:flex; align-items:center; gap:10px; justify-content:center; }
+.ver { font-size:12px; background:#eef3ff; border:1px solid #c9d8ff; color:#334; padding:3px 8px; border-radius:999px; }
+
+button { padding: 6px 10px; border: none; background: var(--btn); color: #fff; border-radius: 6px; cursor: pointer; }
+button:hover { background: var(--btnH); }
+button[disabled] { opacity: .6; cursor: not-allowed; }
+
+.btn-secondary { background:#6c757d; }
+.btn-secondary:hover { background:#545b62; }
+
+.btn-danger { background: var(--danger); }
+.btn-danger:hover { background: var(--dangerH); }
+
+.btn-ok { background: var(--ok); color:#fff; }
+.btn-ok:hover { background: var(--okH); }
+
+.btn-reported {
+  background: var(--ok);
+  color: #fff;
+  font-weight: bold;
+}
+
+.btn-reported:hover {
+  background: var(--okH);
+}
+
+.muted { color:#666; font-size:12px; }
