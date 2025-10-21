@@ -61,6 +61,7 @@
 
 
   <div class="right">
+  <button id="settingsBtn" class="icon-btn" title="Open Settings">⚙</button>
   <button id="suggestionBtn" title="Open Suggestion Box">Suggestion Box</button>
    <button id="exportBtn" title="Export CSV of TACREPs">Export CSV</button>
     <button id="syncSaveBtn" title="Save your changes and merge with the file on disk">Sync &amp; Save</button>
@@ -477,6 +478,28 @@
         <button type="submit" id="sb-save">Save</button>
       </div>
     </form>
+  </div>
+</div>
+<div id="settingsModal" class="modal" aria-hidden="true">
+  <div class="content" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <h3 id="settingsTitle">Settings</h3>
+    <div class="settings-body">
+      <button type="button" id="openTacrepFormatBtn">TACREP Format</button>
+    </div>
+    <div class="actions">
+      <button type="button" id="settingsCloseBtn" class="btn-secondary">Close</button>
+    </div>
+  </div>
+</div>
+<div id="tacrepFormatModal" class="modal" aria-hidden="true">
+  <div class="content" role="dialog" aria-modal="true" aria-labelledby="tacrepFormatTitle">
+    <h3 id="tacrepFormatTitle">TACREP Format</h3>
+    <p class="muted" style="margin:4px 0 12px;">Use the arrows below each field to adjust the display order.</p>
+    <div id="tacrepFormatContainer" class="tacrep-format-container" role="list"></div>
+    <div class="actions">
+      <button type="button" id="tacrepFormatCancelBtn" class="btn-secondary">Close</button>
+      <button type="button" id="tacrepFormatResetBtn">Reset to Default</button>
+    </div>
   </div>
 </div>
 <div id="crewDetailsModal" class="modal" aria-hidden="true">

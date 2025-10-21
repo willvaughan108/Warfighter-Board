@@ -41,6 +41,8 @@
   #app { display:none; padding: 0 20px 20px; }
   .topbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#fff; border:1px solid #ddd; border-radius:8px; padding:10px; margin: 0 20px 16px; }
   .topbar .right { margin-left:auto; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .topbar .icon-btn { width:32px; height:32px; display:flex; align-items:center; justify-content:center; padding:0; font-size:18px; background:#4f46e5; border-radius:50%; color:#fff; transition:background .15s ease; }
+  .topbar .icon-btn:hover { background:#4338ca; }
   .pill { background:#eef3ff; border:1px solid #c9d8ff; border-radius:999px; padding:6px 10px; }
   .pill strong { margin-right:6px; }
 
@@ -134,6 +136,18 @@ padding: 0;
 
   .modal h3 { margin:0 0 10px; }
   .modal label { display:block; margin:8px 0 4px; }
+  .settings-body { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+  .settings-body button { flex:0 0 auto; }
+  .tacrep-format-container { display:flex; flex-direction:column; gap:16px; max-height:420px; overflow:auto; padding-right:4px; }
+  .tacrep-format-block { border:1px solid #d7def2; background:#f5f7ff; border-radius:10px; padding:12px; }
+  .tacrep-format-heading { margin:0 0 8px; font-size:16px; color:#1f2937; }
+  .tacrep-format-row { display:flex; gap:12px; flex-wrap:wrap; }
+  .tacrep-format-field { display:flex; flex-direction:column; align-items:center; gap:6px; padding:8px; min-width:84px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; box-shadow:0 1px 2px rgba(15,23,42,0.08); }
+  .tacrep-format-label { font-weight:600; font-size:13px; text-align:center; color:#111827; }
+  .tacrep-format-controls { display:flex; gap:6px; }
+  .tacrep-format-btn { width:32px; height:28px; border:1px solid #cbd5f5; background:#e0e7ff; color:#1e3a8a; border-radius:6px; cursor:pointer; font-weight:600; font-size:14px; display:flex; align-items:center; justify-content:center; padding:0; }
+  .tacrep-format-btn:not(:disabled):hover { background:#c7d2fe; }
+  .tacrep-format-btn:disabled { opacity:0.4; cursor:default; }
   .row { display:flex; gap:8px; align-items:center; }
   .row > * { flex:1; }
   .tight { gap:6px; }

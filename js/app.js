@@ -83,12 +83,325 @@ let reportedFlag = false; // form-level flag synced with #reportedBtn
   const columnNextNumber = { India:null, Echo:null, AIS:null, Alpha:null, November:null, Golf:null };
   let deletedSetLocal = new Set();
   let suggestions = [];
+  let tacrepFormatPrefs = loadTacrepFormatPrefs();
   let exportCsvUrl = null;
   let pendingMode = null;
   let selecting = false;
   const selectedCodes = new Set();
 
 const ALLOWED_ABBREV_FIELDS = ["time","vesselType","sensor","position","course","speed","trackNumber","minVesselLen","systemOrPlatform","emitterName","activityOrFunction","frequency","additionalInfo"];
+const TACREP_TYPES = ["India","Echo","AIS","Alpha","November","Golf","Other"];
+const DEFAULT_TACREP_FIELD_ORDER = {
+  Echo: ["callsign","timeHHMM","systemOrPlatform","emitterName","activityOrFunction","frequency","position","course","speed","trackNumber","minVesselLen","additionalInfo","reported"],
+  India: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo","reported"],
+  AIS: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo","reported"],
+  Alpha: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo","reported"],
+  November: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo","reported"],
+  Golf: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo","reported"],
+  Other: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo","reported"]
+};
+const TACREP_FIELD_DEFS = {
+  callsign: {
+    label: "Callsign",
+    settingsLabel: "Callsign",
+    getValue: () => (typeof callsign === "string" ? callsign : "")
+  },
+  timeHHMM: {
+    label: "Time",
+    settingsLabel: "Time (Zulu)",
+    getValue: payload => (payload && payload.timeHHMM ? `${payload.timeHHMM}Z` : "")
+  },
+  position: {
+    label: "Pos",
+    settingsLabel: "Position",
+    getValue: payload => {
+      try { return buildPosDisplay(payload || {}); } catch { return ""; }
+    }
+  },
+  systemOrPlatform: {
+    label: "System/Platform",
+    settingsLabel: "System or Platform",
+    getValue: payload => (payload?.systemOrPlatform || "")
+  },
+  emitterName: {
+    label: "Emitter",
+    settingsLabel: "Emitter Name",
+    getValue: payload => (payload?.emitterName || "")
+  },
+  activityOrFunction: {
+    label: "Activity/Function",
+    settingsLabel: "Activity or Function",
+    getValue: payload => (payload?.activityOrFunction || "")
+  },
+  frequency: {
+    label: "Frequency",
+    settingsLabel: "Frequency",
+    getValue: payload => (payload?.frequency || "")
+  },
+  vesselType: {
+    label: "Vessel",
+    settingsLabel: "Vessel Type",
+    getValue: payload => (payload?.vesselType || "")
+  },
+  sensor: {
+    label: "Sensor",
+    settingsLabel: "Sensor",
+    getValue: payload => (payload?.sensor || "")
+  },
+  course: {
+    label: "Course",
+    settingsLabel: "Course",
+    getValue: payload => (payload?.course || "")
+  },
+  speed: {
+    label: "Speed",
+    settingsLabel: "Speed",
+    getValue: payload => (payload?.speed || "")
+  },
+  trackNumber: {
+    label: "Track",
+    settingsLabel: "Track Number",
+    getValue: payload => (payload?.trackNumber || "")
+  },
+  minVesselLen: {
+    label: "MinLen",
+    settingsLabel: "Min Vessel Length",
+    getValue: payload => (payload?.minVesselLen || "")
+  },
+  additionalInfo: {
+    label: "Info",
+    settingsLabel: "Additional Info",
+    getValue: payload => (payload?.info || "")
+  },
+  reported: {
+    label: "Reported",
+    settingsLabel: "Reported",
+    getValue: payload => (typeof payload?.reported === "boolean" ? (payload.reported ? "REPORTED" : "UNREPORTED") : "")
+  }
+};
+const TACREP_FORMAT_STORAGE_KEY = "wf_tacrep_format_v1";
+
+function defaultFieldsForType(type){
+  const base = DEFAULT_TACREP_FIELD_ORDER[type] || DEFAULT_TACREP_FIELD_ORDER.Other;
+  return Array.isArray(base) ? base.slice() : [];
+}
+
+function sanitizeFieldList(type, list){
+  const allowed = defaultFieldsForType(type);
+  if (!allowed.length) return [];
+  const incoming = Array.isArray(list) ? list : [];
+  const filtered = [];
+  incoming.forEach(key => {
+    if (allowed.includes(key) && !filtered.includes(key)) filtered.push(key);
+  });
+  allowed.forEach(key => {
+    if (!filtered.includes(key)) filtered.push(key);
+  });
+  return filtered;
+}
+
+function loadTacrepFormatPrefs(){
+  try {
+    const raw = localStorage.getItem(TACREP_FORMAT_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    const out = {};
+    Object.keys(parsed).forEach(type => {
+      out[type] = sanitizeFieldList(type, parsed[type]);
+    });
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function saveTacrepFormatPrefs(){
+  try {
+    localStorage.setItem(TACREP_FORMAT_STORAGE_KEY, JSON.stringify(tacrepFormatPrefs));
+  } catch {}
+}
+
+function getTacrepFieldOrder(type){
+  const key = TACREP_TYPES.includes(type) ? type : "Other";
+  const current = tacrepFormatPrefs[key];
+  if (Array.isArray(current)) return sanitizeFieldList(key, current);
+  return defaultFieldsForType(key);
+}
+
+function setTacrepFieldOrder(type, order){
+  const key = TACREP_TYPES.includes(type) ? type : "Other";
+  tacrepFormatPrefs = {
+    ...tacrepFormatPrefs,
+    [key]: sanitizeFieldList(key, order)
+  };
+  saveTacrepFormatPrefs();
+}
+
+function resetTacrepFormatPrefs(){
+  tacrepFormatPrefs = {};
+  saveTacrepFormatPrefs();
+}
+
+function tacrepTypeFromCode(code){
+  if (!code) return "Other";
+  const str = String(code).trim();
+  if (str.toUpperCase().startsWith("AIS")) return "AIS";
+  const first = str[0] ? str[0].toUpperCase() : "";
+  return ({ I:"India", E:"Echo", A:"Alpha", N:"November", G:"Golf" }[first]) || "Other";
+}
+
+function tacrepFieldDefsForSettings(type){
+  const allowed = defaultFieldsForType(type);
+  return allowed
+    .map(key => ({ key, def: TACREP_FIELD_DEFS[key] }))
+    .filter(entry => entry.def);
+}
+
+function collectTacrepFields(type, payload){
+  const order = getTacrepFieldOrder(type);
+  const entries = [];
+  order.forEach(key => {
+    const def = TACREP_FIELD_DEFS[key];
+    if (!def || typeof def.getValue !== "function") return;
+    let raw;
+    try {
+      raw = def.getValue(payload || {});
+    } catch {
+      raw = "";
+    }
+    if (raw === undefined || raw === null) return;
+    const str = String(raw).trim();
+    if (!str) return;
+    entries.push({
+      key,
+      label: def.label || key,
+      settingsLabel: def.settingsLabel || def.label || key,
+      value: str
+    });
+  });
+  return entries;
+}
+
+function getTacrepFieldValues(type, payload){
+  const order = getTacrepFieldOrder(type);
+  return order.map(key => {
+    const def = TACREP_FIELD_DEFS[key];
+    if (!def || typeof def.getValue !== "function") return "";
+    try {
+      const raw = def.getValue(payload || {});
+      if (raw === undefined || raw === null) return "";
+      return String(raw).trim();
+    } catch {
+      return "";
+    }
+  });
+}
+
+function getTacrepFieldLabels(type, forSettings = false){
+  const order = getTacrepFieldOrder(type);
+  return order.map(key => {
+    const def = TACREP_FIELD_DEFS[key];
+    if (!def) return key;
+    if (forSettings) return def.settingsLabel || def.label || key;
+    return def.label || key;
+  });
+}
+
+function buildTacrepFormatModal(){
+  const container = document.getElementById("tacrepFormatContainer");
+  if (!container) return;
+  container.innerHTML = "";
+
+  TACREP_TYPES.forEach(type => {
+    const allowed = defaultFieldsForType(type);
+    if (!allowed.length) return;
+
+    const block = document.createElement("div");
+    block.className = "tacrep-format-block";
+    block.dataset.type = type;
+
+    const title = document.createElement("h4");
+    title.className = "tacrep-format-heading";
+    title.textContent = type;
+    block.appendChild(title);
+
+    const row = document.createElement("div");
+    row.className = "tacrep-format-row";
+
+    const order = getTacrepFieldOrder(type);
+    order.forEach((key, idx) => {
+      if (!allowed.includes(key)) return;
+      const def = TACREP_FIELD_DEFS[key];
+      if (!def) return;
+
+      const fieldEl = document.createElement("div");
+      fieldEl.className = "tacrep-format-field";
+      fieldEl.dataset.key = key;
+
+      const label = document.createElement("span");
+      label.className = "tacrep-format-label";
+      label.textContent = def.settingsLabel || def.label || key;
+      fieldEl.appendChild(label);
+
+      const controls = document.createElement("div");
+      controls.className = "tacrep-format-controls";
+
+      const makeBtn = (dir, text, disabled) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "tacrep-format-btn";
+        btn.dataset.dir = String(dir);
+        btn.textContent = text;
+        if (disabled) btn.disabled = true;
+        return btn;
+      };
+
+      controls.appendChild(makeBtn(-1, "<", idx === 0));
+      controls.appendChild(makeBtn(1, ">", idx === order.length - 1));
+
+      fieldEl.appendChild(controls);
+      row.appendChild(fieldEl);
+    });
+
+    block.appendChild(row);
+    container.appendChild(block);
+  });
+}
+
+function refreshAllTacrepDetails(){
+  document.querySelectorAll('.column[data-column] .item').forEach(item => {
+    if (item?.querySelector('.badge[data-code]')) {
+      renderTacrepDetailsInto(item);
+    }
+  });
+}
+
+function handleTacrepFormatClick(e){
+  const btn = e.target && e.target.closest(".tacrep-format-btn");
+  if (!btn) return;
+  const dir = Number(btn.dataset.dir);
+  if (!dir) return;
+  const fieldEl = btn.closest(".tacrep-format-field");
+  const block = btn.closest(".tacrep-format-block");
+  if (!fieldEl || !block) return;
+
+  const type = block.dataset.type || "Other";
+  const key = fieldEl.dataset.key;
+  if (!key) return;
+
+  const order = getTacrepFieldOrder(type);
+  const idx = order.indexOf(key);
+  if (idx === -1) return;
+  const swapIdx = idx + dir;
+  if (swapIdx < 0 || swapIdx >= order.length) return;
+
+  const updated = order.slice();
+  [updated[idx], updated[swapIdx]] = [updated[swapIdx], updated[idx]];
+  setTacrepFieldOrder(type, updated);
+  buildTacrepFormatModal();
+  refreshAllTacrepDetails();
+}
 
   
   let abbrevPrefs = loadAbbrevPrefs();
@@ -343,67 +656,28 @@ try {
 
   // ---- UI helpers ----
 function openExportPreview(){
-// Helpers
-function prettyLatLon(p){
-  const hasDMSLat = p.latDeg && p.latMin && (p.latSec || p.latDecSecStr);
-  const lat = hasDMSLat
-    ? `${p.latDeg}° ${p.latMin}' ${(p.latSec ? String(p.latSec).padStart(2,"0") : "00")}${p.latDecSecStr ? '.' + p.latDecSecStr : ''}" ${p.latHem || ''}`
-    : (p.latDeg && p.latMin
-        ? `${p.latDeg}° ${p.latMin}${p.latDecMinStr ? '.' + p.latDecMinStr : ''}' ${p.latHem || ''}`
-        : "");
-
-  const hasDMSLon = p.lonDeg && p.lonMin && (p.lonSec || p.lonDecSecStr);
-  const lon = hasDMSLon
-    ? `${p.lonDeg}° ${p.lonMin}' ${(p.lonSec ? String(p.lonSec).padStart(2,"0") : "00")}${p.lonDecSecStr ? '.' + p.lonDecSecStr : ''}" ${p.lonHem || ''}`
-    : (p.lonDeg && p.lonMin
-        ? `${p.lonDeg}° ${p.lonMin}${p.lonDecMinStr ? '.' + p.lonDecMinStr : ''}' ${p.lonHem || ''}`
-        : "");
-  return { lat, lon };
-}
-
-function typeFromCode(code){
-if (!code) return "Other";
-if (String(code).startsWith("AIS")) return "AIS";
-const c = String(code)[0]?.toUpperCase();
-return ({ I:"India", E:"Echo", A:"Alpha", N:"November", G:"Golf" }[c]) || "Other";
-}
 function td(s){ return `<td>${String(s ?? "")}</td>`; }
 
-
-// Column sets (unique per TACREP type)
-const HDR_STANDARD = ["Code","Time","Vessel","Sensor","Lat","Lon","Course","Speed","Track","MinLen","Info","Reported","CreatedBy","CreatedAt"];
-const HDR_ECHO = ["Code","Time","System/Platform","Emitter Name","Activity/Function","Frequency","Lat","Lon","Info","Reported","CreatedBy","CreatedAt"];
-
-// Gather TACREP tiles and group by type
 const groups = new Map(); // type -> { headers, rows }
 document.querySelectorAll('.column[data-column]:not([data-column="Deleted"]):not([data-column="History"]):not([data-column="Correlations"]):not([data-column="MissionDetails"]):not([data-column="MissionTimeline"]) .item').forEach(it=>{
 try{
 const p = JSON.parse(it.dataset.payload || "{}");
 if(!p || !p.code) return; // only export real TACREPs
 
-  const t = typeFromCode(p.code);
-  const isEcho = (t === "Echo");
-  const headers = isEcho ? HDR_ECHO : HDR_STANDARD;
-
-  const { lat, lon } = prettyLatLon(p);
-
-  const row = isEcho
-    ? [
-        p.code||"", p.timeHHMM||"",
-        p.systemOrPlatform||"", p.emitterName||"", p.activityOrFunction||"", p.frequency||"",
-        lat, lon,
-        p.info||"",
-        p.reported ? "Yes" : "No",
-        p.createdBy||"", p.createdAt ? new Date(p.createdAt).toISOString() : ""
-      ]
-    : [
-        p.code||"", p.timeHHMM||"", p.vesselType||"", p.sensor||"", lat, lon,
-        p.course||"", p.speed||"", p.trackNumber||"", p.minVesselLen||"", p.info||"",
-        p.reported ? "Yes" : "No", p.createdBy||"", p.createdAt ? new Date(p.createdAt).toISOString() : ""
-      ];
+  const t = tacrepTypeFromCode(p.code);
+  const labels = getTacrepFieldLabels(t, true);
+  const headers = ["Code"].concat(labels, ["CreatedBy","CreatedAt"]);
+  const row = [p.code || ""]
+    .concat(getTacrepFieldValues(t, p))
+    .concat([
+      p.createdBy || "",
+      p.createdAt ? new Date(p.createdAt).toISOString() : ""
+    ]);
 
   if (!groups.has(t)) groups.set(t, { headers, rows: [] });
-  groups.get(t).rows.push(row);
+  const bucket = groups.get(t);
+  bucket.headers = headers;
+  bucket.rows.push(row);
 }catch{}
 
 
@@ -922,32 +1196,9 @@ function renderTacrepDetailsInto(item, payload) {
     details.appendChild(span);
   };
 
-  append("Time", p.timeHHMM ? `${p.timeHHMM}Z` : "");
-
-  try {
-    const posStr = buildPosDisplay(p);
-    if (posStr) append("Pos", posStr);
-  } catch {}
-
-  // Echo
-  append("System/Platform", p.systemOrPlatform);
-  append("Emitter", p.emitterName);
-  append("Activity/Function", p.activityOrFunction);
-  append("Frequency", p.frequency);
-
-  // Standard (if any present)
-  append("Vessel", p.vesselType);
-  append("Sensor", p.sensor);
-
-  append("Course", p.course);
-  append("Speed", p.speed);
-  append("Track", p.trackNumber);
-  append("MinLen", p.minVesselLen);
-  append("Info", p.info);
-
-  if (typeof p.reported === "boolean") {
-    append("Reported", p.reported ? "REPORTED" : "UNREPORTED");
-  }
+  const fallbackType = item.closest(".column")?.dataset.column || "Other";
+  const type = tacrepTypeFromCode(p?.code) || fallbackType;
+  collectTacrepFields(type, p).forEach(entry => append(entry.label, entry.value));
 
   delete details.dataset.rendering;
 }
@@ -1029,6 +1280,38 @@ function renderTacrepDetailsInto(item, payload) {
     $("#downloadJsonBtn").addEventListener("click", downloadCurrentJSON);
     $("#syncSaveBtn").addEventListener("click", ()=>{ if(memoryMode){ downloadCurrentJSON(); } else { requestAutoSyncSave(true); } });
     $("#suggestionBtn").addEventListener("click", ()=> openModal($("#suggestionModal")));
+    const settingsBtn = $("#settingsBtn");
+    const settingsModal = $("#settingsModal");
+    const tacrepFormatModal = $("#tacrepFormatModal");
+    const settingsCloseBtn = $("#settingsCloseBtn");
+    const openTacrepFormatBtn = $("#openTacrepFormatBtn");
+    const tacrepFormatCancelBtn = $("#tacrepFormatCancelBtn");
+    const tacrepFormatResetBtn = $("#tacrepFormatResetBtn");
+    if (settingsBtn && settingsModal) {
+      settingsBtn.addEventListener("click", ()=> openModal(settingsModal));
+    }
+    if (settingsCloseBtn && settingsModal) {
+      settingsCloseBtn.addEventListener("click", ()=> closeModal(settingsModal));
+    }
+    if (openTacrepFormatBtn && tacrepFormatModal) {
+      openTacrepFormatBtn.addEventListener("click", ()=>{
+        if (settingsModal) closeModal(settingsModal);
+        buildTacrepFormatModal();
+        openModal(tacrepFormatModal);
+      });
+    }
+    if (tacrepFormatCancelBtn && tacrepFormatModal) {
+      tacrepFormatCancelBtn.addEventListener("click", ()=> closeModal(tacrepFormatModal));
+    }
+    if (tacrepFormatResetBtn) {
+      tacrepFormatResetBtn.addEventListener("click", ()=>{
+        resetTacrepFormatPrefs();
+        buildTacrepFormatModal();
+        refreshAllTacrepDetails();
+      });
+    }
+    const tfContainer = $("#tacrepFormatContainer");
+    if (tfContainer) tfContainer.addEventListener("click", handleTacrepFormatClick);
 
     $("#cancelEntryBtn").addEventListener("click", ()=> closeForm());
 $("#makeCurrentBtn").addEventListener("click", ()=>{ const d=new Date(); $("#timeZuluInput").value = `${pad2(d.getUTCHours())}${pad2(d.getUTCMinutes())}`; });
@@ -1303,21 +1586,10 @@ openChangeTypeChooser(itemEl);
 
 // Compose the TACREP info text (omitting blanks), formatted for copy/paste
 function composeTacrepInfoText(p){
-  const lines = [];
-  // Note: keep order consistent with user request (position, course, speed, etc. allowed)
-  if (p.timeHHMM)       lines.push(`Time: ${p.timeHHMM}Z`);
-  // Prefer DMS display already implemented elsewhere
-  const pos = buildPosDisplay(p);
-  if (pos)              lines.push(`Position: ${pos}`);
-  if (p.vesselType)     lines.push(`Vessel: ${p.vesselType}`);
-  if (p.sensor)         lines.push(`Sensor: ${p.sensor}`);
-  if (p.course)         lines.push(`Course: ${p.course}`);
-  if (p.speed)          lines.push(`Speed: ${p.speed}`);
-  if (p.trackNumber)    lines.push(`Track: ${p.trackNumber}`);
-  if (p.minVesselLen)   lines.push(`MinLen: ${p.minVesselLen}`);
-  if (p.info)           lines.push(`Info: ${p.info}`);
-  if (typeof p.reported === "boolean") lines.push(`Reported: ${p.reported ? "REPORTED" : "UNREPORTED"}`);
-  return lines.join("\n");
+  const type = tacrepTypeFromCode(p?.code) || "Other";
+  return collectTacrepFields(type, p)
+    .map(entry => `${entry.settingsLabel || entry.label}: ${entry.value}`)
+    .join("\n");
 }
 
 // Open Yes/No confirm (using existing #confirmModal) with dynamic labels
@@ -4895,3 +5167,5 @@ function buildAbbrevList(p){
 
 
 })();
+
+
