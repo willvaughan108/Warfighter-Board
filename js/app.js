@@ -1579,13 +1579,18 @@ function composeTacrepInfoText(p){
 }
 
 // Open Yes/No confirm (using existing #confirmModal) with dynamic labels
-function openSendConfirm(kind /* "correct"|"update" */, tac){
+// tac: the TACREP data to show in preview (latest/corrected state)
+// originalTac: the TACREP data to save to history (pre-correction state)
+function openSendConfirm(kind /* "correct"|"update" */, tac, originalTac){
   const modal = document.getElementById("confirmModal");
   const title = document.getElementById("confirmTitle");
   const text  = document.getElementById("confirmText");
   const btnNo = document.getElementById("confirmCancelBtn");
   const btnYes= document.getElementById("confirmOkBtn");
   if (!modal || !title || !text || !btnNo || !btnYes) return;
+
+  // If no originalTac provided, use tac (for backward compatibility)
+  const historySnapshot = originalTac || tac;
 
   // Customize labels: No / Yes
   title.textContent = "Confirm";
@@ -1603,12 +1608,12 @@ function openSendConfirm(kind /* "correct"|"update" */, tac){
 
   btnNo.onclick = ()=>{
     closeModal(modal);
-    // Log history and return to tiles
-    logChangeHistory(kind, tac.code, crewPosition || "", tac);
+    // Log ORIGINAL state to history
+    logChangeHistory(kind, tac.code, crewPosition || "", historySnapshot);
   };
   btnYes.onclick = ()=>{
     closeModal(modal);
-    // Build preview text and show preview modal
+    // Build preview text and show preview modal using LATEST data
     const header = (kind === "update")
       ? `Update to TACREP ${tac.code}`
       : `Correction to TACREP ${tac.code}`;
@@ -1627,8 +1632,8 @@ function openSendConfirm(kind /* "correct"|"update" */, tac){
     };
     ok.onclick = ()=> {
       closeModal(sp);
-      // After user acknowledges, log history
-      logChangeHistory(kind, tac.code, crewPosition || "", tac);
+      // After user acknowledges, log ORIGINAL state to history
+      logChangeHistory(kind, tac.code, crewPosition || "", historySnapshot);
     };
 
     openModal(sp);
@@ -1702,9 +1707,12 @@ function createHistoryItem(p){
         if (!code) { _changeMode = null; _changeContext = null; return; }
         const badge = document.querySelector(`.column[data-column]:not([data-column="Deleted"]):not([data-column="History"]):not([data-column="Correlations"]) .badge[data-code="${CSS.escape(code)}"]`);
         const item = badge && badge.closest(".item");
-        const latest = item ? JSON.parse(item.dataset.payload || "{}") : _changeContext.payload || {};
-        // Open confirmation tailored to mode
-        openSendConfirm(_changeMode, latest);
+        const latest = item ? JSON.parse(item.dataset.payload || "{}") : null;
+
+        // For correct/update: save ORIGINAL state to history, show LATEST in preview
+        // Pass both: original for history logging, latest for preview display
+        const original = _changeContext.payload;
+        openSendConfirm(_changeMode, latest || original, original);
       } finally {
         // Reset mode/context AFTER we launch confirm (confirm will log history and/or preview)
         _changeMode = null;
@@ -3548,7 +3556,8 @@ function findDeletedElementByCode(code){
   function getChangedFields(newer, older){
     const changed = new Set();
     const keysToCompare = ["timeHHMM", "vesselType", "sensor", "latDeg", "latMin", "latSec", "latDecSecStr", "latHem",
-      "lonDeg", "lonMin", "lonSec", "lonDecSecStr", "lonHem", "course", "speed", "trackNumber", "minVesselLen", "info"];
+      "lonDeg", "lonMin", "lonSec", "lonDecSecStr", "lonHem", "course", "speed", "trackNumber", "minVesselLen", "info",
+      "systemOrPlatform", "emitterName", "activityOrFunction", "frequency"];
 
     keysToCompare.forEach(key => {
       const newerVal = newer[key];
@@ -3576,8 +3585,12 @@ function findDeletedElementByCode(code){
     if (versions.length === 0) {
       content.innerHTML = "<p style='text-align:center; color:#6c757d;'>No history found.</p>";
     } else {
-      versions.forEach((ver, idx) => {
-        const changedFields = idx < versions.length - 1 ? getChangedFields(ver.snapshot, versions[idx + 1].snapshot) : new Set();
+      // Reverse array so oldest history is first, current is last
+      const reversedVersions = [...versions].reverse();
+
+      reversedVersions.forEach((ver, idx) => {
+        // Compare with previous version (if exists) to highlight changes
+        const changedFields = idx > 0 ? getChangedFields(ver.snapshot, reversedVersions[idx - 1].snapshot) : new Set();
 
         const versionEl = document.createElement("div");
         versionEl.className = "history-version";
@@ -3588,7 +3601,18 @@ function findDeletedElementByCode(code){
 
         const label = document.createElement("div");
         label.className = "history-version-label";
-        label.textContent = ver.isCurrent ? "Current Version" : `Version ${idx} (${ver.kind || "edit"})`;
+
+        // Calculate version number: oldest history = Version 1, newest history = Version n-1, current = "Current Version"
+        const historyVersionCount = reversedVersions.filter(v => !v.isCurrent).length;
+        let versionLabel;
+        if (ver.isCurrent) {
+          versionLabel = "Current Version";
+        } else {
+          // For history items, number them 1, 2, 3... (oldest = 1)
+          const versionNum = idx + 1;
+          versionLabel = `Version ${versionNum}${ver.kind ? ` (${ver.kind})` : ""}`;
+        }
+        label.textContent = versionLabel;
 
         const timestamp = document.createElement("div");
         timestamp.className = "history-version-timestamp";
@@ -3602,7 +3626,22 @@ function findDeletedElementByCode(code){
         const body = document.createElement("div");
         body.className = "history-version-body";
 
-        const fieldsToShow = [
+        // Determine TACREP type from code to show appropriate fields
+        const tacrepType = tacrepTypeFromCode(code);
+        const isEcho = tacrepType === "Echo";
+
+        const fieldsToShow = isEcho ? [
+          { key: "timeHHMM", label: "Time" },
+          { key: "systemOrPlatform", label: "System/Platform" },
+          { key: "emitterName", label: "Emitter Name" },
+          { key: "activityOrFunction", label: "Activity/Function" },
+          { key: "frequency", label: "Frequency" },
+          { key: "position", label: "Position", custom: true },
+          { key: "course", label: "Course" },
+          { key: "speed", label: "Speed" },
+          { key: "trackNumber", label: "Track Number" },
+          { key: "info", label: "Additional Info" }
+        ] : [
           { key: "timeHHMM", label: "Time" },
           { key: "vesselType", label: "Vessel Type" },
           { key: "sensor", label: "Sensor" },
@@ -3657,10 +3696,10 @@ function findDeletedElementByCode(code){
         content.appendChild(versionEl);
 
         // Add separator between versions (except after last)
-        if (idx < versions.length - 1) {
+        if (idx < reversedVersions.length - 1) {
           const separator = document.createElement("div");
           separator.className = "history-separator";
-          separator.textContent = "⬇ Changes from previous version highlighted above";
+          separator.textContent = "⬇ Changes from previous version highlighted below";
           content.appendChild(separator);
         }
       });
