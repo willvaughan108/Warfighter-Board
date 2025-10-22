@@ -3062,9 +3062,14 @@ if (state.crewDetails && Array.isArray(state.crewDetails.shifts)) {
 
 deletedSetLocal=new Set();
     // Also restore mission meta that wasn't being applied
+if (typeof state.callsign === "string") {
+  callsign = state.callsign;
+}
 if (typeof state.missionNumber === "string") {
   missionNumber = state.missionNumber;
-  // reflect in the Mission Details tile in case columns haven't forced a refresh yet
+}
+// reflect in the Mission Details tile in case columns haven't forced a refresh yet
+if (state.callsign || state.missionNumber) {
   fillCrewDetailsTileFromState();
 }
 
@@ -3093,6 +3098,7 @@ function gatherStateFromDOM(){
   const state = {
 crewRoster: crewPosition ? [crewPosition] : [],
 blockStartNum,
+callsign,
 missionNumber,
 columns: {},
 correlations: [],
