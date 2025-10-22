@@ -1098,7 +1098,7 @@ fillCrewDetailsTileFromState();
   // ---- Tabs ----
   function setActiveTab(name){
    const validTabs = new Set(Array.from(document.querySelectorAll('.tab-panel')).map(p => p.dataset.tab));
-if (!validTabs.has(name)) { name = 'TC'; try{ localStorage.setItem('wf_active_tab','TC'); }catch{} }
+if (!validTabs.has(name)) { name = 'MD'; try{ localStorage.setItem('wf_active_tab','MD'); }catch{} }
 
 
     // Buttons
@@ -1117,9 +1117,9 @@ if (!validTabs.has(name)) { name = 'TC'; try{ localStorage.setItem('wf_active_ta
     // Remember last tab
     try{ localStorage.setItem('wf_active_tab', name); }catch{}
   }
-function forceTabTC(){
-  setActiveTab('TC'); // make TC the default tab
-  try{ localStorage.setItem('wf_active_tab','TC'); }catch{}
+function forceTabMD(){
+  setActiveTab('MD'); // make Mission Details the default tab
+  try{ localStorage.setItem('wf_active_tab','MD'); }catch{}
 }
 
 
@@ -1150,9 +1150,11 @@ el.value = v;
     return buildPosCompact(p);
   }
 
+  let renderTacrepDetailsInto = ()=>{};
+
   document.addEventListener("DOMContentLoaded", ()=>{
  // === Unified TACREP details renderer (replaces Echo enhancer) ===
-function renderTacrepDetailsInto(item, payload) {
+renderTacrepDetailsInto = function(item, payload) {
   if (!item) return;
 
   let p = payload;
@@ -1188,7 +1190,7 @@ function renderTacrepDetailsInto(item, payload) {
   }
 
   delete details.dataset.rendering;
-}
+};
 
 
 
@@ -1531,6 +1533,7 @@ function openChangeTypeChooser(itemEl){
     if (p) closeModal(p);
     _changeMode = "edit";
     // Fallback open
+    editingItem = itemEl;
     openForm(itemEl.closest('.column')?.dataset.column || "India", JSON.parse(itemEl.dataset.payload||"{}"));
   }
 }
@@ -1542,9 +1545,9 @@ function openChangeTypeChooser(itemEl){
   const btnC = document.getElementById("btnChangeTypeCorrect");
   const btnU = document.getElementById("btnChangeTypeUpdate");
   const btnX = document.getElementById("btnChangeTypeCancel");
-  if (btnE) btnE.onclick = ()=>{ _changeMode = "edit";  if (m) closeModal(m); if (_changeContext) openForm(_changeContext.itemEl.closest('.column')?.dataset.column||"India", _changeContext.payload); };
-  if (btnC) btnC.onclick = ()=>{ _changeMode = "correct"; if (m) closeModal(m); if (_changeContext) openForm(_changeContext.itemEl.closest('.column')?.dataset.column||"India", _changeContext.payload); };
-  if (btnU) btnU.onclick = ()=>{ _changeMode = "update"; if (m) closeModal(m); if (_changeContext) openForm(_changeContext.itemEl.closest('.column')?.dataset.column||"India", _changeContext.payload); };
+  if (btnE) btnE.onclick = ()=>{ _changeMode = "edit";  if (m) closeModal(m); if (_changeContext) { editingItem = _changeContext.itemEl || null; openForm(_changeContext.itemEl.closest('.column')?.dataset.column||"India", _changeContext.payload); } };
+  if (btnC) btnC.onclick = ()=>{ _changeMode = "correct"; if (m) closeModal(m); if (_changeContext) { editingItem = _changeContext.itemEl || null; openForm(_changeContext.itemEl.closest('.column')?.dataset.column||"India", _changeContext.payload); } };
+  if (btnU) btnU.onclick = ()=>{ _changeMode = "update"; if (m) closeModal(m); if (_changeContext) { editingItem = _changeContext.itemEl || null; openForm(_changeContext.itemEl.closest('.column')?.dataset.column||"India", _changeContext.payload); } };
   if (btnX) btnX.onclick = ()=>{ _changeMode = null; _changeContext = null; if (m) closeModal(m); };
 })();
 
@@ -2734,10 +2737,11 @@ document.getElementById("faultTime").value = `${pad2(d.getUTCHours())}${pad2(d.g
 });
 }
 
-    const savedTab = (localStorage.getItem('wf_active_tab') || 'TC');
-    setActiveTab(savedTab);
+    const DEFAULT_TAB = 'MD';
+    setActiveTab(DEFAULT_TAB);
+    try{ localStorage.setItem('wf_active_tab', DEFAULT_TAB); }catch{}
     $$('.tabbar .tab').forEach(btn=>{
-      btn.addEventListener('click', ()=> setActiveTab(btn.dataset.tabTarget || 'TC'));
+      btn.addEventListener('click', ()=> setActiveTab(btn.dataset.tabTarget || DEFAULT_TAB));
     });
 
     
@@ -2796,7 +2800,7 @@ if(pendingMode==="new"){
       landing.style.display="none";
       app.style.display="block";
       app.setAttribute("aria-hidden","false");
-      forceTabTC();
+      forceTabMD();
       applyState(initialState);
       updateFileStatus();
       enableIfReady();
@@ -2809,7 +2813,7 @@ if(pendingMode==="new"){
   landing.style.display="none";
   app.style.display="block";
   app.setAttribute("aria-hidden","false");
-  forceTabTC();
+  forceTabMD();
   applyState(initialState);
   updateFileStatus();
   enableIfReady();
@@ -2833,7 +2837,7 @@ return;
           fileHandle=handle; memoryMode=false;
           await loadStateFromFile();
 landing.style.display="none"; app.style.display="block"; app.setAttribute("aria-hidden","false");
-forceTabTC();   // make TC the default tab
+forceTabMD();   // make Mission Details the default tab
 const bsElFS = document.getElementById("md_blockStart");
 if(!Number.isInteger(blockStartNum)){
 if (bsElFS) bsElFS.value = ""; // leave TC gated; AVP/MPO usable
@@ -2857,7 +2861,7 @@ enableIfReady();
         if (bsElNoFS) bsElNoFS.value = Number.isInteger(blockStartNum) ? String(blockStartNum) : "";
 
             landing.style.display="none"; app.style.display="block"; app.setAttribute("aria-hidden","false");
-forceTabTC();   // ensure TC tab after collab (no FS)
+forceTabMD();   // ensure Mission Details tab after collab (no FS)
 memoryMode=true; fileHandle=null; updateFileStatus(); enableIfReady(); recomputeHighlights();
 
           } catch { alert("Failed to read JSON file."); }
