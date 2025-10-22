@@ -77,7 +77,7 @@
     <button class="tab"         role="tab" id="tabMD"  aria-controls="panelMD"  data-tab-target="MD"  aria-selected="false">Mission Details</button>
 <button class="tab active"  role="tab" id="tabTC"  aria-controls="panelTC"  data-tab-target="TC"  aria-selected="true">TACREPs</button>
 
-<button class="tab"         role="tab" id="tabMPO" aria-controls="panelMPO" data-tab-target="MPO" aria-selected="false">MPO</button>
+<button class="tab"         role="tab" id="tabMPO" aria-controls="panelMPO" data-tab-target="MPO" aria-selected="false">LOG</button>
   </div>
 
   <!-- Panel: TC (your existing board, unchanged markup inside) -->
@@ -156,7 +156,6 @@
 </div>
 
 </div> <button class="add-btn" type="button" disabled style="display:none;">Add New</button> </div> </div> </div>
-  <div class="column" data-column="MissionTimeline" style="grid-column: 1 / -1; margin-top: 12px;"> <h2>Mission Timeline</h2> <div class="items"> <div class="item" id="missionTimelineTile" aria-label="Mission Timeline"> <div class="mtl-controls row tight" style="gap:8px;"> <button type="button" id="mtl_OFFDECK">OFFDECK</button> <button type="button" id="mtl_ONSTA">ONSTA</button> <button type="button" id="mtl_OFFSTA">OFFSTA</button> <button type="button" id="mtl_ONDECK">ONDECK</button> </div> <div id="missionTimelineItems"></div> </div> </div> </div>
 
 <!-- Panel: TC (board) -->
 <div class="tab-panel active" role="tabpanel" id="panelTC" data-tab="TC" aria-labelledby="tabTC">
@@ -207,9 +206,26 @@
 
 
 
-<!-- Panel: MPO -->
+<!-- Panel: MPO (LOG) -->
 <div class="tab-panel" role="tabpanel" id="panelMPO" data-tab="MPO" aria-labelledby="tabMPO">
-  <div class="avp-grid" role="list">
+  <div class="board" style="margin: 0 20px;">
+    <div class="column" data-column="MissionTimeline" style="grid-column: 1 / -1; margin-top: 0;">
+      <h2>Mission Timeline</h2>
+      <div class="items">
+        <div class="item" id="missionTimelineTile" aria-label="Mission Timeline">
+          <div class="mtl-controls row tight" style="gap:8px;">
+            <button type="button" id="mtl_OFFDECK">OFFDECK</button>
+            <button type="button" id="mtl_ONSTA">ONSTA</button>
+            <button type="button" id="mtl_OFFSTA">OFFSTA</button>
+            <button type="button" id="mtl_ONDECK">ONDECK</button>
+          </div>
+          <div id="missionTimelineItems"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="avp-grid" role="list" style="margin-top: 20px;">
     <button class="avp-tile" id="tileMissionLog" role="listitem" type="button"><span>Mission Log</span></button>
   </div>
 </div>

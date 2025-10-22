@@ -196,19 +196,11 @@ padding: 0;
     border-radius:8px; padding:20px; color:#475569;
   }
 /* AVP grid + tiles */
-  /* Mission Timeline — only show under Mission Details; align and add small gap */
-#missionTimelineTile { display: none; }
-#panelMD #missionTimelineTile { display: block; }
+  /* Mission Timeline — only show under LOG (MPO) panel; align and add small gap */
+#missionTimelineTile { display: block; }
 /* Hide details by default so +/- works; expanded cards will use global .item.expanded .item-details rule */
 #missionTimelineTile .item-details { display:none; flex-direction:column; align-items:flex-start; gap:10px; }
 #missionTimelineTile .item.expanded .item-details { display:flex; }
-  
-
-/* Make the Mission Timeline tile span full width of the Mission Details board and add a small top margin */
-#panelMD #mdBoard .column[data-column="MissionTimeline"] {
-grid-column: 1 / -1;
-margin-top: 12px;
-}
 .avp-grid {
   margin: 0 20px;
   display: grid;

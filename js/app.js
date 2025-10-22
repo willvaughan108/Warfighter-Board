@@ -1388,13 +1388,8 @@ const mdCdCancel = document.getElementById("md_cdCancel");
 if(mdCdCancel){ mdCdCancel.addEventListener("click", resetCrewDetailsTile); }
 fillCrewDetailsTileFromState();
 $("#cdSave").addEventListener("click", onCrewDetailsSave);
-// Ensure Mission Timeline lives under Mission Details and is hidden on other tabs
+// Ensure Mission Timeline is expanded by default on LOG tab
 (function(){
-const col = document.querySelector('.column[data-column="MissionTimeline"]');
-const mdBoard = document.getElementById('mdBoard');
-if (col && mdBoard && col.parentElement !== mdBoard) {
-mdBoard.appendChild(col); // move it into the Mission Details board if it was placed globally
-}
 const mtl = document.getElementById('missionTimelineTile');
 if (mtl) {
   mtl.classList.add('expanded');
@@ -1402,13 +1397,13 @@ if (mtl) {
 })();
 
 
-// Patch tab switching to hard-hide Mission Timeline unless Mission Details is active
+// Patch tab switching to hard-hide Mission Timeline unless LOG (MPO) tab is active
 const __origSetActiveTab = setActiveTab;
 setActiveTab = function(name){
 __origSetActiveTab(name);
 const mtl = document.getElementById('missionTimelineTile');
 if (mtl) {
-mtl.style.display = (name === 'MD') ? '' : 'none';
+mtl.style.display = (name === 'MPO') ? '' : 'none';
 }
 };    
 
