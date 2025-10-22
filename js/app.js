@@ -1608,7 +1608,7 @@ function openSendConfirm(kind /* "correct"|"update" */, tac){
   btnNo.onclick = ()=>{
     closeModal(modal);
     // Log history and return to tiles
-    logChangeHistory(kind, tac.code, crewPosition || "");
+    logChangeHistory(kind, tac.code, crewPosition || "", tac);
   };
   btnYes.onclick = ()=>{
     closeModal(modal);
@@ -1632,7 +1632,7 @@ function openSendConfirm(kind /* "correct"|"update" */, tac){
     ok.onclick = ()=> {
       closeModal(sp);
       // After user acknowledges, log history
-      logChangeHistory(kind, tac.code, crewPosition || "");
+      logChangeHistory(kind, tac.code, crewPosition || "", tac);
     };
 
     openModal(sp);
@@ -1642,11 +1642,19 @@ function openSendConfirm(kind /* "correct"|"update" */, tac){
 }
 
 // History logging (UI + persistence flag)
-function logChangeHistory(kind /* "correct"|"update" */, code, by){
+function logChangeHistory(kind /* "correct"|"update"|"edit" */, code, by, tacrepData){
   const when = new Date();
   const ts = `${when.getUTCFullYear()}-${String(when.getUTCMonth()+1).padStart(2,"0")}-${String(when.getUTCDate()).padStart(2,"0")} ${String(when.getUTCHours()).padStart(2,"0")}:${String(when.getUTCMinutes()).padStart(2,"0")}Z`;
-  const verb = (kind === "update") ? "updated" : "corrected";
-  const payload = { id:`hist_${when.getTime()}`, code, kind, by, at: when.getTime(), line:`[${ts}] ${code} — ${verb} by ${by}` };
+  const verb = (kind === "update") ? "updated" : (kind === "edit") ? "edited" : "corrected";
+  const payload = {
+    id:`hist_${when.getTime()}`,
+    code,
+    kind,
+    by,
+    at: when.getTime(),
+    line:`[${ts}] ${code} — ${verb} by ${by}`,
+    snapshot: tacrepData ? {...tacrepData} : null  // Store complete TACREP snapshot
+  };
 
   const list = document.getElementById("historyItems");
   if (list) {
@@ -3327,6 +3335,10 @@ rb.style.fontWeight = "bold";
 
     if(editingItem){
       updateItemElement(editingItem, payload);
+      // Log history for edits (unless it's part of a correct/update flow)
+      if (!_changeMode) {
+        logChangeHistory("edit", finalCode, crewPosition || "", payload);
+      }
     } else {
       const container=colEl.querySelector(".items");
       const el=createItemElement(payload,"active");
@@ -3388,31 +3400,201 @@ function findDeletedElementByCode(code){
     });
   }
 
-  // Helper function to view history for a code
+  // Helper function to view history for a code - opens modal with version comparison
   function viewHistoryForCode(code){
-    // Switch to TC tab if not already there (where history is shown)
-    const tcTab = document.getElementById('tabTC');
-    if (tcTab && !tcTab.classList.contains('active')) {
-      tcTab.click();
+    // Get current version of the TACREP
+    const currentBadge = Array.from(
+      document.querySelectorAll('.column[data-column]:not([data-column="Deleted"]):not([data-column="History"]):not([data-column="Correlations"]) .badge')
+    ).find(b => (b.textContent || '').trim() === code);
+
+    let currentVersion = null;
+    if (currentBadge) {
+      const item = currentBadge.closest('.item');
+      if (item) {
+        try {
+          currentVersion = JSON.parse(item.dataset.payload || "{}");
+        } catch {}
+      }
     }
 
-    // Scroll to the history column
-    const historyColumn = document.querySelector('.column[data-column="History"]');
-    if (historyColumn) {
-      historyColumn.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Get all history entries for this code
+    const historyItems = document.querySelectorAll('#historyItems .item');
+    const historyVersions = [];
+    historyItems.forEach(item => {
+      try {
+        const payload = JSON.parse(item.dataset.payload || "{}");
+        if (payload.code === code && payload.snapshot) {
+          historyVersions.push(payload);
+        }
+      } catch {}
+    });
 
-      // Highlight history items for this code
-      const historyItems = document.querySelectorAll('#historyItems .item');
-      historyItems.forEach(item => {
-        try {
-          const payload = JSON.parse(item.dataset.payload || "{}");
-          if (payload.code === code) {
-            item.classList.add('flash');
-            setTimeout(() => item.classList.remove('flash'), 2000);
-          }
-        } catch {}
+    // Sort by timestamp (newest first)
+    historyVersions.sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
+
+    // Build versions array with current first, then history
+    const allVersions = [];
+    if (currentVersion) {
+      allVersions.push({
+        snapshot: currentVersion,
+        isCurrent: true,
+        timestamp: currentVersion.lastModified || Date.now(),
+        by: currentVersion.createdBy || ""
       });
     }
+    historyVersions.forEach(hv => {
+      allVersions.push({
+        snapshot: hv.snapshot,
+        isCurrent: false,
+        timestamp: hv.at,
+        by: hv.by,
+        kind: hv.kind
+      });
+    });
+
+    // Display in modal
+    showHistoryModal(code, allVersions);
+  }
+
+  // Helper to format field value for display
+  function formatFieldValue(key, value){
+    if (value === null || value === undefined || value === "") return "—";
+    if (key === "timeHHMM") return `${value}Z`;
+    if (key.includes("lat") || key.includes("lon")) {
+      // Handle coordinate fields
+      if (key.endsWith("Hem")) return value;
+      return value;
+    }
+    if (key === "speed") return `${value} kts`;
+    if (key === "course") return `${value}°`;
+    if (key === "minVesselLen") return `${value} ft`;
+    return String(value);
+  }
+
+  // Helper to compare two objects and return changed fields
+  function getChangedFields(newer, older){
+    const changed = new Set();
+    const keysToCompare = ["timeHHMM", "vesselType", "sensor", "latDeg", "latMin", "latSec", "latDecSecStr", "latHem",
+      "lonDeg", "lonMin", "lonSec", "lonDecSecStr", "lonHem", "course", "speed", "trackNumber", "minVesselLen", "info"];
+
+    keysToCompare.forEach(key => {
+      const newerVal = newer[key];
+      const olderVal = older ? older[key] : undefined;
+      if (newerVal !== olderVal) {
+        changed.add(key);
+      }
+    });
+
+    return changed;
+  }
+
+  // Display history modal with version comparison
+  function showHistoryModal(code, versions){
+    const modal = document.getElementById("tacrepHistoryModal");
+    const title = document.getElementById("tacrepHistoryTitle");
+    const content = document.getElementById("tacrepHistoryContent");
+    const closeBtn = document.getElementById("tacrepHistoryCloseBtn");
+
+    if (!modal || !title || !content || !closeBtn) return;
+
+    title.textContent = `History: ${code}`;
+    content.innerHTML = "";
+
+    if (versions.length === 0) {
+      content.innerHTML = "<p style='text-align:center; color:#6c757d;'>No history found.</p>";
+    } else {
+      versions.forEach((ver, idx) => {
+        const changedFields = idx < versions.length - 1 ? getChangedFields(ver.snapshot, versions[idx + 1].snapshot) : new Set();
+
+        const versionEl = document.createElement("div");
+        versionEl.className = "history-version";
+
+        // Header
+        const header = document.createElement("div");
+        header.className = "history-version-header";
+
+        const label = document.createElement("div");
+        label.className = "history-version-label";
+        label.textContent = ver.isCurrent ? "Current Version" : `Version ${idx} (${ver.kind || "edit"})`;
+
+        const timestamp = document.createElement("div");
+        timestamp.className = "history-version-timestamp";
+        const date = new Date(ver.timestamp);
+        timestamp.textContent = `${date.toLocaleDateString()} ${date.toLocaleTimeString()} by ${ver.by}`;
+
+        header.appendChild(label);
+        header.appendChild(timestamp);
+
+        // Body - show all fields
+        const body = document.createElement("div");
+        body.className = "history-version-body";
+
+        const fieldsToShow = [
+          { key: "timeHHMM", label: "Time" },
+          { key: "vesselType", label: "Vessel Type" },
+          { key: "sensor", label: "Sensor" },
+          { key: "position", label: "Position", custom: true },
+          { key: "course", label: "Course" },
+          { key: "speed", label: "Speed" },
+          { key: "trackNumber", label: "Track Number" },
+          { key: "minVesselLen", label: "Min Vessel Length" },
+          { key: "info", label: "Additional Info" }
+        ];
+
+        fieldsToShow.forEach(field => {
+          const fieldLabel = document.createElement("div");
+          fieldLabel.className = "history-field-label";
+          fieldLabel.textContent = `${field.label}:`;
+
+          const fieldValue = document.createElement("div");
+          fieldValue.className = "history-field-value";
+
+          let value;
+          if (field.custom && field.key === "position") {
+            // Build position string
+            const s = ver.snapshot;
+            if (s.latDeg && s.lonDeg) {
+              value = `${s.latDeg}° ${s.latMin || "0"}' ${s.latSec || "0"}.${s.latDecSecStr || "0"}" ${s.latHem || "N"}, ${s.lonDeg}° ${s.lonMin || "0"}' ${s.lonSec || "0"}.${s.lonDecSecStr || "0"}" ${s.lonHem || "E"}`;
+
+              // Check if any lat/lon field changed
+              if (changedFields.has("latDeg") || changedFields.has("latMin") || changedFields.has("latSec") ||
+                  changedFields.has("latDecSecStr") || changedFields.has("latHem") ||
+                  changedFields.has("lonDeg") || changedFields.has("lonMin") || changedFields.has("lonSec") ||
+                  changedFields.has("lonDecSecStr") || changedFields.has("lonHem")) {
+                fieldValue.classList.add("history-field-changed");
+              }
+            } else {
+              value = "—";
+            }
+          } else {
+            value = formatFieldValue(field.key, ver.snapshot[field.key]);
+            if (changedFields.has(field.key)) {
+              fieldValue.classList.add("history-field-changed");
+            }
+          }
+
+          fieldValue.textContent = value;
+
+          body.appendChild(fieldLabel);
+          body.appendChild(fieldValue);
+        });
+
+        versionEl.appendChild(header);
+        versionEl.appendChild(body);
+        content.appendChild(versionEl);
+
+        // Add separator between versions (except after last)
+        if (idx < versions.length - 1) {
+          const separator = document.createElement("div");
+          separator.className = "history-separator";
+          separator.textContent = "⬇ Changes from previous version highlighted above";
+          content.appendChild(separator);
+        }
+      });
+    }
+
+    closeBtn.onclick = () => closeModal(modal);
+    openModal(modal);
   }
 
   // Function to update all history button states

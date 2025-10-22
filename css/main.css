@@ -93,6 +93,18 @@ user-select: text;
   .icon-history { background: #2196F3; } .icon-history:hover { background: #1976D2; }
   .icon-history:disabled { background: #9e9e9e; cursor: not-allowed; opacity: 0.6; }
 
+  /* TACREP History Modal */
+  .tacrep-history-container { max-height:500px; overflow-y:auto; display:flex; flex-direction:column; gap:16px; }
+  .history-version { background:#f8f9fa; border:1px solid #dee2e6; border-radius:8px; padding:12px; }
+  .history-version-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:8px; border-bottom:2px solid #dee2e6; }
+  .history-version-label { font-weight:700; font-size:14px; color:#495057; }
+  .history-version-timestamp { font-size:12px; color:#6c757d; }
+  .history-version-body { display:grid; grid-template-columns:auto 1fr; gap:6px 12px; font-size:13px; }
+  .history-field-label { font-weight:600; color:#495057; }
+  .history-field-value { color:#212529; }
+  .history-field-changed { background:#fff3cd; padding:2px 4px; border-radius:3px; border:1px solid #ffc107; }
+  .history-separator { text-align:center; color:#6c757d; font-size:12px; margin:8px 0; }
+
   .item-details { display:none; flex-wrap:wrap; gap:8px 16px; line-height:1.3; margin-top:6px; align-items:center; }
   .item.expanded .item-details { display:flex; }
   /* Crew Details tile should always show its details */
