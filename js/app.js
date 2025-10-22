@@ -1986,7 +1986,118 @@ if (onDeckBtn) {
   });
 }
 
+// Mission Log button handler
+const missionLogBtn = document.getElementById("mtl_MISSIONLOG");
+if (missionLogBtn) {
+  missionLogBtn.addEventListener("click", ()=> {
+    // Reset form and editing state
+    document.getElementById("mlTime").value = "";
+    document.getElementById("mlComments").value = "";
+    window._editingMissionLogItem = null;
+    openModal(document.getElementById("missionLogModal"));
+  });
+}
 
+// Mission Log - Current time button
+const mlTimeCurrentBtn = document.getElementById("mlTimeCurrent");
+if (mlTimeCurrentBtn) {
+  mlTimeCurrentBtn.addEventListener("click", ()=> {
+    const d = new Date();
+    document.getElementById("mlTime").value = `${pad2(d.getUTCHours())}${pad2(d.getUTCMinutes())}`;
+  });
+}
+
+// Mission Log - Cancel button
+const mlCancelBtn = document.getElementById("mlCancel");
+if (mlCancelBtn) {
+  mlCancelBtn.addEventListener("click", ()=> {
+    closeModal(document.getElementById("missionLogModal"));
+  });
+}
+
+// Mission Log - Form submission
+const missionLogForm = document.getElementById("missionLogForm");
+if (missionLogForm) {
+  missionLogForm.addEventListener("submit", (e)=> {
+    e.preventDefault();
+
+    const timeVal = document.getElementById("mlTime").value.trim();
+    const commentsVal = document.getElementById("mlComments").value.trim();
+
+    // Validate time
+    if (!timeVal || timeVal.length !== 4) {
+      alert("Please enter time in HHMM format.");
+      return;
+    }
+
+    const hh = Number(timeVal.slice(0, 2));
+    const mm = Number(timeVal.slice(2, 4));
+    if (hh > 23 || mm > 59) {
+      alert("Invalid time. Hours must be 0-23 and minutes must be 0-59.");
+      return;
+    }
+
+    const list = document.getElementById("missionTimelineItems");
+
+    // Check if we're editing an existing entry
+    if (window._editingMissionLogItem) {
+      // Update existing entry
+      const existingPayload = JSON.parse(window._editingMissionLogItem.dataset.payload || "{}");
+      const updatedPayload = {
+        ...existingPayload,
+        timeHHMM: timeVal,
+        comments: commentsVal,
+        lastModified: Date.now()
+      };
+
+      updateTimelineItem(window._editingMissionLogItem, updatedPayload);
+      window._editingMissionLogItem = null;
+
+      dirty = true;
+      requestAutoSyncSave(true);
+      showBanner("Mission Log entry updated.");
+    } else {
+      // Create new mission timeline entry
+      const payload = {
+        timeHHMM: timeVal,
+        type: "MISSIONLOG",
+        comments: commentsVal,
+        createdBy: crewPosition || "",
+        createdAt: Date.now(),
+        lastModified: Date.now()
+      };
+
+      if (list) {
+        const el = createTimelineItem(payload);
+
+        // Insert in chronological order (newest first)
+        const existingItems = Array.from(list.children);
+        let inserted = false;
+        for (const item of existingItems) {
+          try {
+            const itemPayload = JSON.parse(item.dataset.payload || "{}");
+            const itemTime = itemPayload.timeHHMM || "";
+            if (timeVal > itemTime) {
+              list.insertBefore(el, item);
+              inserted = true;
+              break;
+            }
+          } catch {}
+        }
+
+        if (!inserted) {
+          list.appendChild(el);
+        }
+
+        dirty = true;
+        requestAutoSyncSave(true);
+        showBanner("Mission Log entry added.");
+      }
+    }
+
+    closeModal(document.getElementById("missionLogModal"));
+  });
+}
 
   const cont1Tile = document.getElementById("tileCONT1");
 if (cont1Tile) {
@@ -3721,6 +3832,8 @@ copyBtn.addEventListener("click", async (e)=>{
     const posStr = buildPosDisplay(p);
     if (posStr) parts.push(`Pos: ${posStr}`);
     if (p.altitude) parts.push(`Alt: ${p.altitude}`);
+  } else if (p.type === "MISSIONLOG" && p.comments) {
+    parts.push(`Comments: ${p.comments}`);
   }
   const text = parts.join(" / ");
   try {
@@ -3747,6 +3860,8 @@ if (p.type === "OFFDECK" && p.airfield) {
   const posStr = buildPosDisplay(p);
   if (posStr) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Pos:</em> ${escapeHtml(posStr)}</span>`);
   if (p.altitude) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Alt:</em> ${escapeHtml(String(p.altitude))}</span>`);
+} else if (p.type === "MISSIONLOG") {
+  if (p.comments) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Comments:</em> ${escapeHtml(p.comments)}</span>`);
 }
 
 }
@@ -3756,10 +3871,11 @@ function createTimelineItem(p){
   item.className = "item";
   item.dataset.payload = JSON.stringify(p);
     item._kind = (
-  p.type === "OFFDECK" ? "TIMELINE_OFFDECK" :
-  p.type === "ONDECK"  ? "TIMELINE_ONDECK"  :
-  p.type === "ONSTA"   ? "TIMELINE_ONSTA"   :
-  p.type === "OFFSTA"  ? "TIMELINE_OFFSTA"  :
+  p.type === "OFFDECK"    ? "TIMELINE_OFFDECK" :
+  p.type === "ONDECK"     ? "TIMELINE_ONDECK"  :
+  p.type === "ONSTA"      ? "TIMELINE_ONSTA"   :
+  p.type === "OFFSTA"     ? "TIMELINE_OFFSTA"  :
+  p.type === "MISSIONLOG" ? "TIMELINE_MISSIONLOG" :
   "TIMELINE_GENERIC"
 );
 
@@ -3860,6 +3976,12 @@ window._editingTimelineItem = item;
 const titleText = (payload.type === "OFFSTA") ? "Edit OFFSTA Report" : "Edit ONSTA Report";
 document.getElementById("onStaTitle").textContent = titleText;
 openModal(document.getElementById("onStaModal"));
+} else if (payload.type === "MISSIONLOG") {
+  // Prefill Mission Log modal for editing
+  document.getElementById("mlTime").value = payload.timeHHMM || "";
+  document.getElementById("mlComments").value = payload.comments || "";
+  window._editingMissionLogItem = item;
+  openModal(document.getElementById("missionLogModal"));
 } else {
 alert("Edit not supported for this type (yet).");
 }
