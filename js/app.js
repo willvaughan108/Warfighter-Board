@@ -4018,9 +4018,22 @@ function updateTimelineItem(item, p){
   item.dataset.payload = JSON.stringify(p);
 
   // Header pieces
-  const [pm, timeBadge, typeBadge] = item.querySelectorAll(".item-header .badge-wrap > *");
-  if (timeBadge) timeBadge.textContent = (p.timeHHMM ? `${p.timeHHMM}Z` : "—");
-  if (typeBadge) typeBadge.textContent = (p.type || "—");
+  const badgeWrap = item.querySelector(".item-header .badge-wrap");
+  const pm = badgeWrap ? badgeWrap.querySelector(".pm") : null;
+  const timeBadge = badgeWrap ? badgeWrap.querySelector(".badge-time") : null;
+  const typeBadge = badgeWrap ? badgeWrap.querySelector(".badge-type") : null;
+  const faultBadge = badgeWrap ? badgeWrap.querySelector(".badge-fault") : null;
+  if (timeBadge) timeBadge.textContent = (p.timeHHMM ? `${p.timeHHMM}Z` : "-");
+  if (typeBadge) typeBadge.textContent = (p.type || "-");
+  if (faultBadge) {
+    if (p.type === "FAULT" && (p.fault || p.fault === "")) {
+      faultBadge.textContent = p.fault ? String(p.fault) : "(No fault code)";
+      faultBadge.style.display = "";
+    } else {
+      faultBadge.style.display = "none";
+      faultBadge.textContent = "";
+    }
+  }
 
   // Creator line
   const creator = item.querySelector(".creator");
@@ -4085,8 +4098,9 @@ if (p.type === "OFFDECK" && p.airfield) {
 } else if (p.type === "MISSIONLOG") {
   if (p.comments) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Comments:</em> ${escapeHtml(p.comments)}</span>`);
 } else if (p.type === "FAULT") {
-  if (p.fault) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Fault:</em> ${escapeHtml(p.fault)}</span>`);
-  if (p.comments) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Comments:</em> ${escapeHtml(p.comments)}</span>`);
+  if (p.comments) {
+    details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Comments:</em> ${escapeHtml(p.comments)}</span>`);
+  }
 }
 
 }
@@ -4117,16 +4131,21 @@ function createTimelineItem(p){
   pm.textContent = "+";
 
   const timeBadge = document.createElement("div");
-  timeBadge.className = "badge";
-  timeBadge.textContent = (p.timeHHMM ? `${p.timeHHMM}Z` : "—");
+  timeBadge.className = "badge badge-time";
+  timeBadge.textContent = (p.timeHHMM ? `${p.timeHHMM}Z` : "-");
 
   const typeBadge = document.createElement("div");
-  typeBadge.className = "badge";
-  typeBadge.textContent = (p.type || "—");
+  typeBadge.className = "badge badge-type";
+  typeBadge.textContent = (p.type || "-");
+
+  const faultBadge = document.createElement("div");
+  faultBadge.className = "badge badge-fault";
+  faultBadge.style.display = "none";
 
   badgeWrap.appendChild(pm);
   badgeWrap.appendChild(timeBadge);
   badgeWrap.appendChild(typeBadge);
+  badgeWrap.appendChild(faultBadge);
 
   const creator = document.createElement("span");
   creator.className = "creator";
@@ -4161,7 +4180,7 @@ function createTimelineItem(p){
 
   // Interactions
   const toggle = ()=> toggleExpandItem(item);
-  [pm, timeBadge, typeBadge].forEach(b => {
+  [pm, timeBadge, typeBadge, faultBadge].forEach(b => {
     b.tabIndex = 0;
     b.addEventListener("click", toggle);
     b.addEventListener("keydown", (e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggle(); } });
