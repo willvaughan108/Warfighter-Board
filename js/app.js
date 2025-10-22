@@ -83,9 +83,25 @@ let reportedFlag = false; // form-level flag synced with #reportedBtn
   const columnNextNumber = { India:null, Echo:null, AIS:null, Alpha:null, November:null, Golf:null };
   let deletedSetLocal = new Set();
   let historyCodesLocal = new Set();
+  let changeHistoryEntries = [];
   let suggestions = [];
   let tacrepFormatPrefs = loadTacrepFormatPrefs();
   let exportCsvUrl = null;
+  const DEBUG_HISTORY = false;
+  function normalizeHistoryEntry(raw){
+    if(!raw || typeof raw!=="object") return null;
+    const at=Number(raw.at||Date.now());
+    const id=raw.id ? String(raw.id) : `hist_${at}`;
+    const code=raw.code ? String(raw.code) : "";
+    const kind=raw.kind || "edit";
+    const by=raw.by ? String(raw.by) : "";
+    const line=raw.line ? String(raw.line) : "";
+    const snapshot=(raw.snapshot && typeof raw.snapshot==="object") ? {...raw.snapshot} : null;
+    return { id, code, kind, by, at, line, snapshot };
+  }
+  function cloneHistoryEntry(entry){
+    return normalizeHistoryEntry(entry);
+  }
   let pendingMode = null;
   let pendingTacrepColumn = null; // Track which TACREP column user tried to add to before Block Start was set
   let selecting = false;
@@ -1661,30 +1677,33 @@ function logChangeHistory(kind /* "correct"|"update"|"edit" */, code, by, tacrep
   const when = new Date();
   const ts = `${when.getUTCFullYear()}-${String(when.getUTCMonth()+1).padStart(2,"0")}-${String(when.getUTCDate()).padStart(2,"0")} ${String(when.getUTCHours()).padStart(2,"0")}:${String(when.getUTCMinutes()).padStart(2,"0")}Z`;
   const verb = (kind === "update") ? "updated" : (kind === "edit") ? "edited" : "corrected";
-  const payload = {
+  const payload = normalizeHistoryEntry({
     id:`hist_${when.getTime()}`,
     code,
     kind,
     by,
     at: when.getTime(),
-    line:`[${ts}] ${code} — ${verb} by ${by}`,
-    snapshot: tacrepData ? {...tacrepData} : null  // Store complete TACREP snapshot
-  };
+    line:`[${ts}] ${code} - ${verb} by ${by}`,
+    snapshot: tacrepData ? {...tacrepData} : null
+  });
+  if(!payload) return;
 
   const list = document.getElementById("historyItems");
   if (list) {
+    const dup = payload.id ? list.querySelector(`.item[data-history-id="${CSS.escape(payload.id)}"]`) : null;
+    if (dup) dup.remove();
     const el = createHistoryItem(payload);
-    // If editing, replace the existing card in-place; otherwise insert new
     list.insertBefore(el, list.firstChild || null);
     if (code) { historyCodesLocal.add(code); }
+  }
 
-    dirty = true;
-    requestAutoSyncSave(true);
+  changeHistoryEntries = [payload, ...changeHistoryEntries.filter(entry => entry.id !== payload.id)];
 
-    // Update all history button states
-    if (typeof updateAllHistoryButtons === 'function') {
-      updateAllHistoryButtons();
-    }
+  dirty = true;
+  requestAutoSyncSave(true);
+
+  if (typeof updateAllHistoryButtons === 'function') {
+    updateAllHistoryButtons();
   }
 }
 
@@ -1693,6 +1712,7 @@ function createHistoryItem(p){
   const el = document.createElement("div");
   el.className = "item";
   el.dataset.payload = JSON.stringify(p);
+  el.dataset.historyId = p.id || "";
   el.innerHTML = `
     <div class="item-header">
       <div class="creator">${escapeHtml(p.line || "")}</div>
@@ -3111,10 +3131,14 @@ const historyList = document.getElementById("historyItems");
 if (historyList) { historyList.innerHTML = ""; } // Clear history before loading
 historyCodesLocal.clear();
 if (Array.isArray(state.changeHistory)) {
-  console.log(`[DEBUG] Loading ${state.changeHistory.length} history items from state`);
-  const sortedH = state.changeHistory.slice().sort((a,b)=> Number(b.at||0) - Number(a.at||0));
-  sortedH.forEach(p => {
-    console.log(`[DEBUG] Loading history item for code: ${p.code}`);
+  if (DEBUG_HISTORY) console.debug(`[History] loading ${state.changeHistory.length} items from state`, state.changeHistory);
+  const normalizedHistory = state.changeHistory
+    .map(normalizeHistoryEntry)
+    .filter(Boolean)
+    .sort((a,b)=> Number(b.at||0) - Number(a.at||0));
+  changeHistoryEntries = normalizedHistory.slice();
+  normalizedHistory.forEach(p => {
+    if (DEBUG_HISTORY) console.debug(`[History] insert ${p.code}`);
     if (p && p.code) { historyCodesLocal.add(p.code); }
     if (historyList) {
       try {
@@ -3123,7 +3147,8 @@ if (Array.isArray(state.changeHistory)) {
     }
   });
 } else {
-  console.log('[DEBUG] No changeHistory in state');
+  changeHistoryEntries = [];
+  if (DEBUG_HISTORY) console.debug("[History] none in state");
 }
 
 const wxList = document.getElementById("weatherItems");
@@ -3254,8 +3279,11 @@ const missionTimeline = Array.from(document.querySelectorAll("#missionTimelineIt
 .map(it => JSON.parse(it.dataset.payload || "{}"));
 state.missionTimeline = missionTimeline;
 // Change History (persist newest-first list)
-const changeHistory = Array.from(document.querySelectorAll("#historyItems .item"))
-  .map(it => JSON.parse(it.dataset.payload || "{}"));
+const changeHistory = changeHistoryEntries.length
+  ? changeHistoryEntries.map(cloneHistoryEntry)
+  : Array.from(document.querySelectorAll("#historyItems .item"))
+      .map(it => normalizeHistoryEntry(JSON.parse(it.dataset.payload || "{}")))
+      .filter(Boolean);
 state.changeHistory = changeHistory;
 
   return state;
@@ -3508,7 +3536,7 @@ function findDeletedElementByCode(code){
   function hasHistoryForCode(code){
     if (!code) return false;
     if (historyCodesLocal.has(code)) {
-      console.log(`[DEBUG] hasHistoryForCode(${code}): found=true (cached), historyItems.length=${document.querySelectorAll('#historyItems .item').length}`);
+      if (DEBUG_HISTORY) console.debug(`[History] cache hit for ${code}`);
       return true;
     }
     const historyItems = document.querySelectorAll('#historyItems .item');
@@ -3521,7 +3549,7 @@ function findDeletedElementByCode(code){
       }
     });
     if (found) { historyCodesLocal.add(code); }
-    console.log(`[DEBUG] hasHistoryForCode(${code}): found=${found}, historyItems.length=${historyItems.length}`);
+    if (DEBUG_HISTORY) console.debug(`[History] cache scan ${code} -> ${found}`);
     return found;
   }
 
@@ -3543,16 +3571,22 @@ function findDeletedElementByCode(code){
     }
 
     // Get all history entries for this code
-    const historyItems = document.querySelectorAll('#historyItems .item');
-    const historyVersions = [];
-    historyItems.forEach(item => {
-      try {
-        const payload = JSON.parse(item.dataset.payload || "{}");
-        if (payload.code === code && payload.snapshot) {
-          historyVersions.push(payload);
-        }
-      } catch {}
-    });
+    const codeKey = String(code || "").trim().toUpperCase();
+    const sourceHistory = changeHistoryEntries.length
+      ? changeHistoryEntries
+      : Array.from(document.querySelectorAll('#historyItems .item'))
+          .map(item => {
+            try {
+              return normalizeHistoryEntry(JSON.parse(item.dataset.payload || "{}"));
+            } catch {
+              return null;
+            }
+          })
+          .filter(Boolean);
+
+    const historyVersions = sourceHistory
+      .filter(entry => entry && entry.snapshot && String(entry.code || "").trim().toUpperCase() === codeKey)
+      .map(cloneHistoryEntry);
 
     // Sort by timestamp (newest first)
     historyVersions.sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
@@ -3756,9 +3790,9 @@ function findDeletedElementByCode(code){
 
   // Function to update all history button states
   function updateAllHistoryButtons(){
-    console.log('[DEBUG] updateAllHistoryButtons() called');
+    if (DEBUG_HISTORY) console.debug("[History] updating button states");
     const allItems = document.querySelectorAll('.column[data-column]:not([data-column="History"]) .item');
-    console.log(`[DEBUG] Found ${allItems.length} TACREP items to check`);
+    if (DEBUG_HISTORY) console.debug(`[History] scanning ${allItems.length} TACREPs`);
     allItems.forEach(item => {
       try {
         const payload = JSON.parse(item.dataset.payload || "{}");
@@ -3766,7 +3800,7 @@ function findDeletedElementByCode(code){
         if (historyBtn && payload.code) {
           const hasHistory = hasHistoryForCode(payload.code);
           historyBtn.disabled = !hasHistory;
-          console.log(`[DEBUG] Updated button for ${payload.code}: disabled=${!hasHistory}`);
+          if (DEBUG_HISTORY) console.debug(`[History] button ${payload.code} disabled=${!hasHistory}`);
         }
       } catch {}
     });
