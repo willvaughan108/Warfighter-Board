@@ -86,6 +86,7 @@ let reportedFlag = false; // form-level flag synced with #reportedBtn
   let tacrepFormatPrefs = loadTacrepFormatPrefs();
   let exportCsvUrl = null;
   let pendingMode = null;
+  let pendingTacrepColumn = null; // Track which TACREP column user tried to add to before Block Start was set
   let selecting = false;
   const selectedCodes = new Set();
 
@@ -1261,7 +1262,7 @@ renderTacrepDetailsInto = function(item, payload) {
 
     $("#crewCancel").addEventListener("click", ()=>{ pendingMode=null; closeModal($("#crewModal")); });
     $("#crewApply").addEventListener("click", onCrewApply);
-    $("#blockCancel").addEventListener("click", ()=> closeModal($("#blockModal")));
+    $("#blockCancel").addEventListener("click", ()=>{ pendingTacrepColumn=null; closeModal($("#blockModal")); });
     $("#blockApply").addEventListener("click", onBlockApply);
     $("#changeCrewBtn").addEventListener("click", ()=>{ $("#crewInput").value=crewPosition; openModal($("#crewModal")); });
 
@@ -1896,14 +1897,15 @@ if(!btn) return;
 const colEl = btn.closest(".column");
 if (!colEl || colEl.querySelector(':scope > .add-btn') !== btn) return;
 
-// If Block Start not set, prompt for it
+const col = colEl.dataset.column;
+
+// If Block Start not set, prompt for it and remember which column was clicked
 if(!Number.isInteger(blockStartNum)){
+pendingTacrepColumn = col; // Remember which TACREP type user wanted to add
 $("#blockInput").value = "";
 openModal($("#blockModal"));
 return;
 }
-
-const col = colEl.dataset.column;
 
 // For normal columns, open the TACREP entry form as before.
 if (col && col !== "Correlations") {
@@ -2979,6 +2981,12 @@ requestAutoSyncSave(true);
 } catch(e) {
 console.warn("Block Start save failed:", e);
 }
+
+// If user was trying to add a TACREP before Block Start was set, open that form now
+if (pendingTacrepColumn && pendingTacrepColumn !== "Correlations") {
+openForm(pendingTacrepColumn, null);
+}
+pendingTacrepColumn = null; // Clear the pending column
 
 // Clear pendingMode if it was set
 pendingMode = null;
