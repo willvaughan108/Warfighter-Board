@@ -82,6 +82,7 @@ let reportedFlag = false; // form-level flag synced with #reportedBtn
 
   const columnNextNumber = { India:null, Echo:null, AIS:null, Alpha:null, November:null, Golf:null };
   let deletedSetLocal = new Set();
+  let historyCodesLocal = new Set();
   let suggestions = [];
   let tacrepFormatPrefs = loadTacrepFormatPrefs();
   let exportCsvUrl = null;
@@ -1592,6 +1593,11 @@ function openSendConfirm(kind /* "correct"|"update" */, tac, originalTac){
   // If no originalTac provided, use tac (for backward compatibility)
   const historySnapshot = originalTac || tac;
 
+  // Set flag to prevent addEventListener from interfering
+  if (typeof usingSendConfirmMode !== 'undefined') {
+    usingSendConfirmMode = true;
+  }
+
   // Customize labels: No / Yes
   title.textContent = "Confirm";
   btnNo.textContent = "No";
@@ -1607,11 +1613,19 @@ function openSendConfirm(kind /* "correct"|"update" */, tac, originalTac){
   btnYes.onclick = null;
 
   btnNo.onclick = ()=>{
+    // Reset flag and clear handlers
+    if (typeof usingSendConfirmMode !== 'undefined') usingSendConfirmMode = false;
+    btnNo.onclick = null;
+    btnYes.onclick = null;
     closeModal(modal);
     // Log ORIGINAL state to history
     logChangeHistory(kind, tac.code, crewPosition || "", historySnapshot);
   };
   btnYes.onclick = ()=>{
+    // Reset flag and clear handlers
+    if (typeof usingSendConfirmMode !== 'undefined') usingSendConfirmMode = false;
+    btnNo.onclick = null;
+    btnYes.onclick = null;
     closeModal(modal);
     // Build preview text and show preview modal using LATEST data
     const header = (kind === "update")
@@ -1660,9 +1674,9 @@ function logChangeHistory(kind /* "correct"|"update"|"edit" */, code, by, tacrep
   const list = document.getElementById("historyItems");
   if (list) {
     const el = createHistoryItem(payload);
-     // If editing, replace the existing card in-place; otherwise insert new
-  list.insertBefore(el, list.firstChild || null);
-
+    // If editing, replace the existing card in-place; otherwise insert new
+    list.insertBefore(el, list.firstChild || null);
+    if (code) { historyCodesLocal.add(code); }
 
     dirty = true;
     requestAutoSyncSave(true);
@@ -2855,6 +2869,12 @@ document.getElementById("faultTime").value = `${pad2(d.getUTCHours())}${pad2(d.g
           dirty=false;
           showBanner("Remote changes detected. View updated.");
           recomputeHighlights();
+          // Update history buttons after remote changes are applied (with small delay to ensure DOM is ready)
+          setTimeout(() => {
+            if (typeof updateAllHistoryButtons === 'function') {
+              updateAllHistoryButtons();
+            }
+          }, 100);
         }
       }catch{}
     }, POLL_MS);
@@ -3010,6 +3030,12 @@ pendingMode = null;
     const incoming=JSON.parse(txt);
     applyState(incoming);
     dirty=false;
+    // Update history buttons after loading from file
+    setTimeout(() => {
+      if (typeof updateAllHistoryButtons === 'function') {
+        updateAllHistoryButtons();
+      }
+    }, 100);
   }
 
   // ---- Save (debounced) ----
@@ -3064,7 +3090,9 @@ crewDetails
 
   function applyState(state){
 
-document.querySelectorAll('.column[data-column]:not([data-column="MissionDetails"]):not([data-column="MissionTimeline"]) .items').forEach(div=> div.innerHTML="");
+// Clear all TACREP columns (but not History, MissionDetails, or MissionTimeline)
+document.querySelectorAll('.column[data-column]:not([data-column="MissionDetails"]):not([data-column="MissionTimeline"]):not([data-column="History"]) .items').forEach(div=> div.innerHTML="");
+
 const faultList = document.getElementById("faultItems");
 if (faultList) { faultList.innerHTML = ""; }
     if (Array.isArray(state.faults)) {
@@ -3077,27 +3105,30 @@ if (faultList) { faultList.innerHTML = ""; }
     });
   }
 }
-// Render Change History (newest first if provided)
-if (Array.isArray(state.changeHistory)) {
-  const list = document.getElementById("historyItems");
-  if (list) {
-    const sortedH = state.changeHistory.slice().sort((a,b)=> Number(b.at||0) - Number(a.at||0));
-    sortedH.forEach(p => {
-      try { list.appendChild(createHistoryItem(p)); } catch(e){ console.warn("history skip:", e); }
-    });
 
-    // Update all history button states after loading history
-    if (typeof updateAllHistoryButtons === 'function') {
-      updateAllHistoryButtons();
+// Render Change History (newest first if provided)
+const historyList = document.getElementById("historyItems");
+if (historyList) { historyList.innerHTML = ""; } // Clear history before loading
+historyCodesLocal.clear();
+if (Array.isArray(state.changeHistory)) {
+  console.log(`[DEBUG] Loading ${state.changeHistory.length} history items from state`);
+  const sortedH = state.changeHistory.slice().sort((a,b)=> Number(b.at||0) - Number(a.at||0));
+  sortedH.forEach(p => {
+    console.log(`[DEBUG] Loading history item for code: ${p.code}`);
+    if (p && p.code) { historyCodesLocal.add(p.code); }
+    if (historyList) {
+      try {
+        historyList.appendChild(createHistoryItem(p));
+      } catch(e){ console.warn("history skip:", e); }
     }
-  }
+  });
+} else {
+  console.log('[DEBUG] No changeHistory in state');
 }
 
 const wxList = document.getElementById("weatherItems");
 if (wxList) { wxList.innerHTML = ""; }
 const mtlList = document.getElementById("missionTimelineItems");
-    const histList = document.getElementById("historyItems");
-if (histList) { histList.innerHTML = ""; }
 
 if (mtlList) { mtlList.innerHTML = ""; }
 
@@ -3170,6 +3201,11 @@ if (state.callsign || state.missionNumber) {
     });
 
     enableIfReady(); dirty=false; recomputeHighlights();
+
+    // Update history button states after all state has been applied
+    if (typeof updateAllHistoryButtons === 'function') {
+      updateAllHistoryButtons();
+    }
   }
 
 function gatherStateFromDOM(){
@@ -3470,8 +3506,13 @@ function findDeletedElementByCode(code){
   // ---- TACREP elements ----
   // Helper function to check if history exists for a code
   function hasHistoryForCode(code){
+    if (!code) return false;
+    if (historyCodesLocal.has(code)) {
+      console.log(`[DEBUG] hasHistoryForCode(${code}): found=true (cached), historyItems.length=${document.querySelectorAll('#historyItems .item').length}`);
+      return true;
+    }
     const historyItems = document.querySelectorAll('#historyItems .item');
-    return Array.from(historyItems).some(item => {
+    const found = Array.from(historyItems).some(item => {
       try {
         const payload = JSON.parse(item.dataset.payload || "{}");
         return payload.code === code;
@@ -3479,6 +3520,9 @@ function findDeletedElementByCode(code){
         return false;
       }
     });
+    if (found) { historyCodesLocal.add(code); }
+    console.log(`[DEBUG] hasHistoryForCode(${code}): found=${found}, historyItems.length=${historyItems.length}`);
+    return found;
   }
 
   // Helper function to view history for a code - opens modal with version comparison
@@ -3585,12 +3629,10 @@ function findDeletedElementByCode(code){
     if (versions.length === 0) {
       content.innerHTML = "<p style='text-align:center; color:#6c757d;'>No history found.</p>";
     } else {
-      // Reverse array so oldest history is first, current is last
-      const reversedVersions = [...versions].reverse();
-
-      reversedVersions.forEach((ver, idx) => {
-        // Compare with previous version (if exists) to highlight changes
-        const changedFields = idx > 0 ? getChangedFields(ver.snapshot, reversedVersions[idx - 1].snapshot) : new Set();
+      // Keep order: Current first, then history (newest to oldest)
+      versions.forEach((ver, idx) => {
+        // Compare with next version (older) to highlight what changed FROM that version
+        const changedFields = idx < versions.length - 1 ? getChangedFields(ver.snapshot, versions[idx + 1].snapshot) : new Set();
 
         const versionEl = document.createElement("div");
         versionEl.className = "history-version";
@@ -3602,14 +3644,17 @@ function findDeletedElementByCode(code){
         const label = document.createElement("div");
         label.className = "history-version-label";
 
-        // Calculate version number: oldest history = Version 1, newest history = Version n-1, current = "Current Version"
-        const historyVersionCount = reversedVersions.filter(v => !v.isCurrent).length;
+        // Calculate version number: Current on top, then history counting down
+        // Total history items (excluding current)
+        const historyCount = versions.filter(v => !v.isCurrent).length;
         let versionLabel;
         if (ver.isCurrent) {
           versionLabel = "Current Version";
         } else {
-          // For history items, number them 1, 2, 3... (oldest = 1)
-          const versionNum = idx + 1;
+          // For history items: newest = highest number, oldest = 1
+          // If current is at idx 0, first history is at idx 1
+          const historyIdx = ver.isCurrent ? 0 : (idx - (versions[0].isCurrent ? 1 : 0));
+          const versionNum = historyCount - historyIdx;
           versionLabel = `Version ${versionNum}${ver.kind ? ` (${ver.kind})` : ""}`;
         }
         label.textContent = versionLabel;
@@ -3696,10 +3741,10 @@ function findDeletedElementByCode(code){
         content.appendChild(versionEl);
 
         // Add separator between versions (except after last)
-        if (idx < reversedVersions.length - 1) {
+        if (idx < versions.length - 1) {
           const separator = document.createElement("div");
           separator.className = "history-separator";
-          separator.textContent = "⬇ Changes from previous version highlighted below";
+          separator.textContent = "⬇ Changes from older version highlighted above";
           content.appendChild(separator);
         }
       });
@@ -3711,7 +3756,9 @@ function findDeletedElementByCode(code){
 
   // Function to update all history button states
   function updateAllHistoryButtons(){
+    console.log('[DEBUG] updateAllHistoryButtons() called');
     const allItems = document.querySelectorAll('.column[data-column]:not([data-column="History"]) .item');
+    console.log(`[DEBUG] Found ${allItems.length} TACREP items to check`);
     allItems.forEach(item => {
       try {
         const payload = JSON.parse(item.dataset.payload || "{}");
@@ -3719,6 +3766,7 @@ function findDeletedElementByCode(code){
         if (historyBtn && payload.code) {
           const hasHistory = hasHistoryForCode(payload.code);
           historyBtn.disabled = !hasHistory;
+          console.log(`[DEBUG] Updated button for ${payload.code}: disabled=${!hasHistory}`);
         }
       } catch {}
     });
@@ -4679,10 +4727,38 @@ function createCont1Item(p){
   const confirmModal=$("#confirmModal");
   const confirmText=$("#confirmText");
   let confirmCallback=null;
-  function openConfirm(htmlText,onOk){ $("#confirmTitle").textContent="Confirm"; confirmText.innerHTML=htmlText; confirmCallback=onOk; openModal(confirmModal); }
-  function closeConfirm(){ confirmCallback=null; closeModal(confirmModal); }
-  $("#confirmCancelBtn").addEventListener("click", closeConfirm);
-  $("#confirmOkBtn").addEventListener("click", async ()=>{ const cb=confirmCallback; closeConfirm(); if(cb) await cb(); });
+  let usingSendConfirmMode=false; // Flag to prevent addEventListener from interfering with openSendConfirm
+
+  function openConfirm(htmlText,onOk){
+    $("#confirmTitle").textContent="Confirm";
+    confirmText.innerHTML=htmlText;
+    confirmCallback=onOk;
+    usingSendConfirmMode=false;
+    // Clear any onclick handlers that may have been set by openSendConfirm
+    $("#confirmCancelBtn").onclick = null;
+    $("#confirmOkBtn").onclick = null;
+    openModal(confirmModal);
+  }
+  function closeConfirm(){
+    confirmCallback=null;
+    usingSendConfirmMode=false;
+    // Clear any onclick handlers
+    $("#confirmCancelBtn").onclick = null;
+    $("#confirmOkBtn").onclick = null;
+    closeModal(confirmModal);
+  }
+  $("#confirmCancelBtn").addEventListener("click", ()=>{
+    // If using send confirm mode, let onclick handle it
+    if (usingSendConfirmMode) return;
+    closeConfirm();
+  });
+  $("#confirmOkBtn").addEventListener("click", async ()=>{
+    // If using send confirm mode, let onclick handle it
+    if (usingSendConfirmMode) return;
+    const cb=confirmCallback;
+    closeConfirm();
+    if(cb) await cb();
+  });
 
   // ---- Delete/Restore ----
 function moveItemToDeleted(itemEl){
