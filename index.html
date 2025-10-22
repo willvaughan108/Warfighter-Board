@@ -220,6 +220,7 @@
             <button type="button" id="mtl_ONDECK">ONDECK</button>
           </div>
           <div class="mtl-controls row tight" style="gap:8px; margin-top:8px;">
+            <button type="button" id="mtl_FAULTS">Faults</button>
             <button type="button" id="mtl_MISSIONLOG">Mission Log</button>
           </div>
           <div id="missionTimelineItems"></div>
@@ -641,6 +642,31 @@
       <div class="actions" style="margin-top:12px;">
         <button id="mlCancel" type="button" class="btn-secondary">Cancel</button>
         <button id="mlSave" type="submit">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Mission Timeline Fault Modal -->
+<div id="timelineFaultModal" class="modal" aria-hidden="true">
+  <div class="content" role="dialog" aria-modal="true" aria-labelledby="timelineFaultTitle">
+    <h3 id="timelineFaultTitle">Log Fault</h3>
+    <form id="timelineFaultForm">
+      <label for="tfTime">Time (Zulu)</label>
+      <div class="row tight" style="gap:8px;">
+        <input id="tfTime" type="text" placeholder="HHMM" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required>
+        <button id="tfTimeCurrent" type="button" class="btn-secondary">Current</button>
+      </div>
+
+      <label for="tfCode">Fault</label>
+      <input id="tfCode" type="text" placeholder="e.g., Generator offline">
+
+      <label for="tfComments">Comments</label>
+      <textarea id="tfComments" rows="3" placeholder="Details..."></textarea>
+
+      <div class="actions" style="margin-top:12px;">
+        <button id="tfCancel" type="button" class="btn-secondary">Cancel</button>
+        <button id="tfSave" type="submit">Save</button>
       </div>
     </form>
   </div>

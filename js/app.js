@@ -1521,6 +1521,7 @@ clampDigitsInput(document.getElementById("md_blockStart"));
 clampDigitsInput($("#codeNumber"));
 clampDigitsInput($("#minVesselLen"));
 clampDigitsInput($("#faultTime"));
+clampDigitsInput($("#tfTime"));
 
     
     // Abbrev prefs
@@ -2030,6 +2031,17 @@ if (onDeckBtn) {
   });
 }
 
+const timelineFaultBtn = document.getElementById("mtl_FAULTS");
+if (timelineFaultBtn) {
+  timelineFaultBtn.addEventListener("click", ()=> {
+    document.getElementById("tfTime").value = "";
+    document.getElementById("tfCode").value = "";
+    document.getElementById("tfComments").value = "";
+    window._editingTimelineFaultItem = null;
+    openModal(document.getElementById("timelineFaultModal"));
+  });
+}
+
 // Mission Log button handler
 const missionLogBtn = document.getElementById("mtl_MISSIONLOG");
 if (missionLogBtn) {
@@ -2140,6 +2152,83 @@ if (missionLogForm) {
     }
 
     closeModal(document.getElementById("missionLogModal"));
+  });
+}
+
+// Mission Timeline Fault modal controls
+const tfTimeCurrentBtn = document.getElementById("tfTimeCurrent");
+if (tfTimeCurrentBtn) {
+  tfTimeCurrentBtn.addEventListener("click", ()=> {
+    const d = new Date();
+    document.getElementById("tfTime").value = `${pad2(d.getUTCHours())}${pad2(d.getUTCMinutes())}`;
+  });
+}
+
+const tfCancelBtn = document.getElementById("tfCancel");
+if (tfCancelBtn) {
+  tfCancelBtn.addEventListener("click", ()=> {
+    closeModal(document.getElementById("timelineFaultModal"));
+    window._editingTimelineFaultItem = null;
+  });
+}
+
+const timelineFaultForm = document.getElementById("timelineFaultForm");
+if (timelineFaultForm) {
+  timelineFaultForm.addEventListener("submit", (e)=> {
+    e.preventDefault();
+    const timeVal = (document.getElementById("tfTime").value || "").trim().replace(/\D/g,"").slice(0,4);
+    if (!timeVal || timeVal.length !== 4) {
+      alert("Enter time in HHMM Zulu.");
+      return;
+    }
+    const hh = Number(timeVal.slice(0,2));
+    const mm = Number(timeVal.slice(2,4));
+    if (hh > 23 || mm > 59) {
+      alert("Invalid time. Hours must be 0-23 and minutes 0-59.");
+      return;
+    }
+    const faultVal = (document.getElementById("tfCode").value || "").trim();
+    const commentsVal = (document.getElementById("tfComments").value || "").trim();
+    const container = document.getElementById("missionTimelineItems");
+    if (!container) {
+      closeModal(document.getElementById("timelineFaultModal"));
+      return;
+    }
+    const now = Date.now();
+
+    if (window._editingTimelineFaultItem) {
+      const existing = JSON.parse(window._editingTimelineFaultItem.dataset.payload || "{}");
+      const payload = {
+        ...existing,
+        timeHHMM: timeVal,
+        fault: faultVal,
+        comments: commentsVal,
+        lastModified: now
+      };
+      updateTimelineItem(window._editingTimelineFaultItem, payload);
+      window._editingTimelineFaultItem = null;
+      dirty = true;
+      requestAutoSyncSave(true);
+      showBanner("Fault updated.");
+    } else {
+      const payload = {
+        timeHHMM: timeVal,
+        type: "FAULT",
+        fault: faultVal,
+        comments: commentsVal,
+        createdBy: crewPosition || "",
+        createdAt: now,
+        lastModified: now
+      };
+      const el = createTimelineItem(payload);
+      if (container.firstChild) container.insertBefore(el, container.firstChild);
+      else container.appendChild(el);
+      dirty = true;
+      requestAutoSyncSave(true);
+      showBanner("Fault logged to Mission Timeline.");
+    }
+
+    closeModal(document.getElementById("timelineFaultModal"));
   });
 }
 
@@ -3923,6 +4012,7 @@ function toggleExpandItem(el){
 window._editingTimelineItem = null;
   
 window._timelineEntryType = "ONSTA";
+window._editingTimelineFaultItem = null;
 
 function updateTimelineItem(item, p){
   item.dataset.payload = JSON.stringify(p);
@@ -3963,6 +4053,9 @@ copyBtn.addEventListener("click", async (e)=>{
     if (p.altitude) parts.push(`Alt: ${p.altitude}`);
   } else if (p.type === "MISSIONLOG" && p.comments) {
     parts.push(`Comments: ${p.comments}`);
+  } else if (p.type === "FAULT") {
+    if (p.fault) parts.push(`Fault: ${p.fault}`);
+    if (p.comments) parts.push(`Comments: ${p.comments}`);
   }
   const text = parts.join(" / ");
   try {
@@ -3991,6 +4084,9 @@ if (p.type === "OFFDECK" && p.airfield) {
   if (p.altitude) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Alt:</em> ${escapeHtml(String(p.altitude))}</span>`);
 } else if (p.type === "MISSIONLOG") {
   if (p.comments) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Comments:</em> ${escapeHtml(p.comments)}</span>`);
+} else if (p.type === "FAULT") {
+  if (p.fault) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Fault:</em> ${escapeHtml(p.fault)}</span>`);
+  if (p.comments) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Comments:</em> ${escapeHtml(p.comments)}</span>`);
 }
 
 }
@@ -4005,6 +4101,7 @@ function createTimelineItem(p){
   p.type === "ONSTA"      ? "TIMELINE_ONSTA"   :
   p.type === "OFFSTA"     ? "TIMELINE_OFFSTA"  :
   p.type === "MISSIONLOG" ? "TIMELINE_MISSIONLOG" :
+  p.type === "FAULT"      ? "TIMELINE_FAULT" :
   "TIMELINE_GENERIC"
 );
 
@@ -4111,6 +4208,12 @@ openModal(document.getElementById("onStaModal"));
   document.getElementById("mlComments").value = payload.comments || "";
   window._editingMissionLogItem = item;
   openModal(document.getElementById("missionLogModal"));
+} else if (payload.type === "FAULT") {
+  document.getElementById("tfTime").value = payload.timeHHMM || "";
+  document.getElementById("tfCode").value = payload.fault || "";
+  document.getElementById("tfComments").value = payload.comments || "";
+  window._editingTimelineFaultItem = item;
+  openModal(document.getElementById("timelineFaultModal"));
 } else {
 alert("Edit not supported for this type (yet).");
 }
