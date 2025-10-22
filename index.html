@@ -224,10 +224,6 @@
       </div>
     </div>
   </div>
-
-  <div class="avp-grid" role="list" style="margin-top: 20px;">
-    <button class="avp-tile" id="tileMissionLog" role="listitem" type="button"><span>Mission Log</span></button>
-  </div>
 </div>
 
 </section>
@@ -611,38 +607,6 @@
 
 <div class="actions" style="margin-top:12px;"> <button id="faultsCancel" class="btn-secondary" type="button">Cancel</button> <button id="faultsSave" type="button">Save</button> </div>
 </div></div>
-
- <div id="missionLogModal" class="modal" aria-hidden="true"> <div class="content" role="dialog" aria-modal="true" aria-labelledby="missionLogTitle"> <h3 id="missionLogTitle">Mission Log</h3>
-<div id="missionLogFormWrap" style="display:none;">
-  <form id="missionLogForm">
-    <input type="hidden" id="mlEditingId">
-
-    <label for="mlTime">Time (Zulu)</label>
-    <div class="row tight inline-check">
-      <input id="mlTime" type="text" placeholder="HHMM" inputmode="numeric" pattern="[0-9]{4}" maxlength="4">
-      <button id="mlTimeCurrent" type="button" class="btn-secondary">Current</button>
-    </div>
-
-    <label for="mlComments">Comments</label>
-    <div class="row tight">
-      <textarea id="mlComments" placeholder="Details..." rows="3"></textarea>
-    </div>
-
-    <div class="actions" style="margin-top:12px;">
-      <button id="mlCancel" class="btn-secondary" type="button">Cancel</button>
-      <button id="mlSave" type="submit">Save</button>
-    </div>
-  </form>
-</div>
-
-<div id="missionLogItems"></div>
-<div class="actions" style="margin-top:12px;">
-  <button id="mlAddBtn" type="button">New Mission Log Entry</button>
-  <button id="mlCloseBtn" class="btn-secondary" type="button">Close</button>
-</div>
-
-</div> </div>
-</div>
 
 <!-- TACREP History Modal -->
 <div id="tacrepHistoryModal" class="modal" aria-hidden="true">

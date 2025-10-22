@@ -1926,14 +1926,6 @@ openForm(col, null);
 
 
 // Weather modal open + wiring
-    const missionLogTile = document.getElementById("tileMissionLog");
-if (missionLogTile) {
-missionLogTile.addEventListener("click", ()=> {
-// reset form view each time
-resetMissionLogForm();
-openModal(document.getElementById("missionLogModal"));
-});
-}
 
 const weatherTile = document.getElementById("tileWeather");
       function addMissionTimelineEvent(label){
@@ -2079,30 +2071,6 @@ if (wxSaveBtn) {
 }
 
 // Clamp inputs for Weather form
- const mlCloseBtn = document.getElementById("mlCloseBtn");
-if (mlCloseBtn) {
-mlCloseBtn.addEventListener("click", ()=> closeModal(document.getElementById("missionLogModal")));
-}
-const mlAddBtn = document.getElementById("mlAddBtn");
-if (mlAddBtn) {
-mlAddBtn.addEventListener("click", openMissionLogFormNew);
-}
-const mlCancel = document.getElementById("mlCancel");
-if (mlCancel) {
-mlCancel.addEventListener("click", resetMissionLogForm);
-}
-const mlTimeCurrent = document.getElementById("mlTimeCurrent");
-if (mlTimeCurrent) {
-  mlTimeCurrent.addEventListener("click", ()=> {
-    const d = new Date();
-    document.getElementById("mlTime").value = `${pad2(d.getUTCHours())}${pad2(d.getUTCMinutes())}`;
-  });
-}
-
-const mlForm = document.getElementById("missionLogForm");
-if (mlForm) {
-mlForm.addEventListener("submit", onMissionLogSave);
-}
 function onWeatherSave(e){
   e && e.preventDefault && e.preventDefault();
 
@@ -2961,7 +2929,6 @@ correlations:[],
 deleted:[],
 suggestions:[],
 faults:[],
-missionLog:[],
 missionTimeline:[],
 
 crewDetails
@@ -3001,8 +2968,6 @@ if (Array.isArray(state.changeHistory)) {
 
 const wxList = document.getElementById("weatherItems");
 if (wxList) { wxList.innerHTML = ""; }
-const mlList = document.getElementById("missionLogItems");
-if (mlList) { mlList.innerHTML = ""; }
 const mtlList = document.getElementById("missionTimelineItems");
     const histList = document.getElementById("historyItems");
 if (histList) { histList.innerHTML = ""; }
@@ -3021,15 +2986,6 @@ if (mtlList) { mtlList.innerHTML = ""; }
       }
     }
 
-    if (Array.isArray(state.missionLog)) {
-      const sortedML = state.missionLog.slice().sort((a,b)=> Number(b.createdAt||0) - Number(a.createdAt||0));
-      const containerML = document.getElementById("missionLogItems");
-      if (containerML) {
-        sortedML.forEach(p => {
-          try { containerML.appendChild(createMissionLogItem(p)); } catch(e){ console.warn("missionLog skip:", e); }
-        });
-      }
-    }
 
 
    if(Number.isInteger(state.blockStartNum)){ blockStartNum=state.blockStartNum; }
@@ -3131,9 +3087,6 @@ const faults = Array.from(document.querySelectorAll("#faultItems .item"))
   .map(it => JSON.parse(it.dataset.payload || "{}"));
 state.faults = faults;
 
-const missionLog = Array.from(document.querySelectorAll("#missionLogItems .item"))
-.map(it => JSON.parse(it.dataset.payload || "{}"));
-state.missionLog = missionLog;
 const missionTimeline = Array.from(document.querySelectorAll("#missionTimelineItems .item"))
 .map(it => JSON.parse(it.dataset.payload || "{}"));
 state.missionTimeline = missionTimeline;
@@ -4551,201 +4504,6 @@ function createCont1Item(p){
   const parts = buildAbbrevList(payload);
   const inside = [crew, ...parts].filter(Boolean).join(" / ");
   return inside ? `(${inside})` : (crew ? `(${crew})` : "");
-}
-
-/* ---- Mission Log UI ---- */
-let editingMissionLogItem = null;
-
-function resetMissionLogForm(){
-const wrap = document.getElementById("missionLogFormWrap");
-if (wrap) wrap.style.display = "none";
-const ids = ["mlEditingId","mlTime","mlComments"];
-ids.forEach(id=>{
-  const el = document.getElementById(id);
-  if(!el) return;
-  el.value = "";
-});
-editingMissionLogItem = null;
-}
-
-function openMissionLogFormNew(){
-editingMissionLogItem = null;
-document.getElementById("mlEditingId").value = "";
-const wrap = document.getElementById("missionLogFormWrap");
-if (wrap) wrap.style.display = "block";
-}
-
-function openMissionLogFormEdit(item, payload){
-editingMissionLogItem = item;
-document.getElementById("mlEditingId").value = String(payload.createdAt || "");
-document.getElementById("mlTime").value = payload.timeHHMM || "";
-document.getElementById("mlComments").value = payload.comments || "";
-const wrap = document.getElementById("missionLogFormWrap");
-if (wrap) wrap.style.display = "block";
-}
-
-function onMissionLogSave(e){
-e.preventDefault();
-
-const t = (document.getElementById("mlTime").value || "").trim().replace(/\D/g,"").slice(0,4);
-if(t && (t.length!==4 || Number(t.slice(0,2))>23 || Number(t.slice(2,4))>59)){
-  alert("Time must be HHMM Zulu.");
-  return;
-}
-
-const comments = (document.getElementById("mlComments").value || "").trim();
-
-const now = Date.now();
-const existingPayload = editingMissionLogItem ? JSON.parse(editingMissionLogItem.dataset.payload || "{}") : {};
-const payload = {
-  ...existingPayload,
-  timeHHMM: t,
-  comments,
-  createdBy: existingPayload.createdBy || (typeof crewPosition === "string" ? crewPosition : ""),
-  createdAt: existingPayload.createdAt || now,
-  lastModified: now
-};
-
-const list = document.getElementById("missionLogItems");
-
-if(editingMissionLogItem){
-  updateMissionLogItem(editingMissionLogItem, payload);
-} else {
-  const el = createMissionLogItem(payload);
-  // newest first — put on top
-  if(list.firstChild) list.insertBefore(el, list.firstChild);
-  else list.appendChild(el);
-}
-
-resetMissionLogForm();
-dirty = true;
-requestAutoSyncSave(true);
-showBanner("Mission log entry saved.");
-}
-
-function updateMissionLogItem(item, p){
-  item.dataset.payload = JSON.stringify(p);
-
-  // Update header badges
-  const [timeBadge] = item.querySelectorAll(".badge-wrap .badge");
-  if (timeBadge) timeBadge.textContent = (p.timeHHMM ? `${p.timeHHMM}Z` : "—");
-
-  // Update creator line
-  const creator = item.querySelector(".creator");
-  if (creator) {
-    const when = isValidDate(new Date(p.createdAt))
-      ? `${fmtDateNoYearUTC(new Date(p.createdAt))} ${fmtTimeUTC(new Date(p.createdAt))}`
-      : "";
-    const by = p.createdBy || "";
-    creator.textContent = [by, when].filter(Boolean).join(" • ");
-  }
-
-  // Rebuild details
-  const details = item.querySelector(".item-details");
-  details.innerHTML = "";
-
-  const copyBtn = document.createElement("button");
-  copyBtn.type = "button";
-  copyBtn.className = "copy-pill";
-  copyBtn.textContent = "Copy";
-  copyBtn.addEventListener("click", async (e)=>{
-    e.stopPropagation();
-    const parts=[];
-    if(p.timeHHMM) parts.push(`Time: ${p.timeHHMM}Z`);
-    if(p.comments) parts.push(`Comments: ${p.comments}`);
-    const text = parts.join(" / ");
-    try{
-      await navigator.clipboard.writeText(text);
-      copyBtn.textContent="Copied!";
-      copyBtn.classList.add("copied");
-      setTimeout(()=>{ copyBtn.textContent="Copy"; copyBtn.classList.remove("copied"); },1200);
-    }catch{
-      alert("Copy failed.");
-    }
-  });
-
-  const firstRow = document.createElement("span");
-  firstRow.className = "detail";
-  firstRow.appendChild(copyBtn);
-  details.appendChild(firstRow);
-
-  if(p.comments) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Comments:</em> ${escapeHtml(p.comments)}</span>`);
-}
-
-function createMissionLogItem(p){
-  const item = document.createElement("div");
-  item.className = "item";
-  item.dataset.payload = JSON.stringify(p);
-
-  // Header
-  const header = document.createElement("div");
-  header.className = "item-header";
-
-  const badgeWrap = document.createElement("div");
-  badgeWrap.className = "badge-wrap";
-
-  const timeBadge = document.createElement("div");
-  timeBadge.className = "badge";
-  timeBadge.textContent = (p.timeHHMM ? `${p.timeHHMM}Z` : "—");
-
-  badgeWrap.appendChild(timeBadge);
-
-  const creator = document.createElement("span");
-  creator.className = "creator";
-
-  const actions = document.createElement("div");
-  actions.className = "item-actions";
-
-  const editBtn = document.createElement("button");
-  editBtn.type = "button";
-  editBtn.className = "icon-btn icon-edit";
-  editBtn.innerHTML = "✏️";
-  editBtn.title = "Edit";
-
-  const delBtn = document.createElement("button");
-  delBtn.type = "button";
-  delBtn.className = "icon-btn icon-delete";
-  delBtn.innerHTML = "❌";
-  delBtn.title = "Delete";
-
-  actions.appendChild(editBtn);
-  actions.appendChild(delBtn);
-
-  header.appendChild(badgeWrap);
-  header.appendChild(creator);
-  header.appendChild(actions);
-
-  const details = document.createElement("div");
-  details.className = "item-details";
-
-  item.appendChild(header);
-  item.appendChild(details);
-
-  // Interactions
-  [timeBadge].forEach(b => {
-    b.tabIndex = 0;
-    b.addEventListener("click", () => toggleExpandItem(item));
-    b.addEventListener("keydown", (e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggleExpandItem(item); } });
-  });
-
-  editBtn.addEventListener("click", (e)=>{
-    e.stopPropagation();
-    const payload = JSON.parse(item.dataset.payload || "{}");
-    openMissionLogFormEdit(item, payload);
-  });
-
-  delBtn.addEventListener("click", (e)=>{
-    e.stopPropagation();
-    openConfirm("Delete this mission log entry?", ()=>{
-      item.remove();
-      dirty = true;
-      requestAutoSyncSave(true);
-    });
-  });
-
-  // Initial render
-  updateMissionLogItem(item, p);
-  return item;
 }
 
   // ---- Confirm ----
