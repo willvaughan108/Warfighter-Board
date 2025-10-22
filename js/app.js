@@ -1657,6 +1657,11 @@ function logChangeHistory(kind /* "correct"|"update" */, code, by){
 
     dirty = true;
     requestAutoSyncSave(true);
+
+    // Update all history button states
+    if (typeof updateAllHistoryButtons === 'function') {
+      updateAllHistoryButtons();
+    }
   }
 }
 
@@ -2983,6 +2988,11 @@ if (Array.isArray(state.changeHistory)) {
     sortedH.forEach(p => {
       try { list.appendChild(createHistoryItem(p)); } catch(e){ console.warn("history skip:", e); }
     });
+
+    // Update all history button states after loading history
+    if (typeof updateAllHistoryButtons === 'function') {
+      updateAllHistoryButtons();
+    }
   }
 }
 
@@ -3365,6 +3375,61 @@ function findDeletedElementByCode(code){
   }
 
   // ---- TACREP elements ----
+  // Helper function to check if history exists for a code
+  function hasHistoryForCode(code){
+    const historyItems = document.querySelectorAll('#historyItems .item');
+    return Array.from(historyItems).some(item => {
+      try {
+        const payload = JSON.parse(item.dataset.payload || "{}");
+        return payload.code === code;
+      } catch {
+        return false;
+      }
+    });
+  }
+
+  // Helper function to view history for a code
+  function viewHistoryForCode(code){
+    // Switch to TC tab if not already there (where history is shown)
+    const tcTab = document.getElementById('tabTC');
+    if (tcTab && !tcTab.classList.contains('active')) {
+      tcTab.click();
+    }
+
+    // Scroll to the history column
+    const historyColumn = document.querySelector('.column[data-column="History"]');
+    if (historyColumn) {
+      historyColumn.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      // Highlight history items for this code
+      const historyItems = document.querySelectorAll('#historyItems .item');
+      historyItems.forEach(item => {
+        try {
+          const payload = JSON.parse(item.dataset.payload || "{}");
+          if (payload.code === code) {
+            item.classList.add('flash');
+            setTimeout(() => item.classList.remove('flash'), 2000);
+          }
+        } catch {}
+      });
+    }
+  }
+
+  // Function to update all history button states
+  function updateAllHistoryButtons(){
+    const allItems = document.querySelectorAll('.column[data-column]:not([data-column="History"]) .item');
+    allItems.forEach(item => {
+      try {
+        const payload = JSON.parse(item.dataset.payload || "{}");
+        const historyBtn = item.querySelector('.icon-history');
+        if (historyBtn && payload.code) {
+          const hasHistory = hasHistoryForCode(payload.code);
+          historyBtn.disabled = !hasHistory;
+        }
+      } catch {}
+    });
+  }
+
   function createItemElement(data, context="active"){
     const { code }=data;
     const item=document.createElement("div");
@@ -3381,10 +3446,23 @@ function findDeletedElementByCode(code){
     item._renderAbbrev=()=>{ creator.textContent=renderCreatorAndAbbrev(JSON.parse(item.dataset.payload)); };
 
     const actions=document.createElement("div"); actions.className="item-actions";
+    const historyBtn=document.createElement("button"); historyBtn.type="button"; historyBtn.className="icon-btn icon-history"; historyBtn.innerHTML="🕐"; historyBtn.title="View History";
     const editBtn=document.createElement("button"); editBtn.type="button"; editBtn.className="icon-btn icon-edit"; editBtn.innerHTML="✏️"; editBtn.title="Edit";
     const delBtn=document.createElement("button"); delBtn.type="button"; delBtn.className="icon-btn icon-delete"; delBtn.innerHTML="❌"; delBtn.title="Move to Deleted";
     const restoreBtn=document.createElement("button"); restoreBtn.type="button"; restoreBtn.className="icon-btn icon-restore"; restoreBtn.innerHTML="↩️"; restoreBtn.title="Restore";
-    if(context==="deleted"){ actions.appendChild(restoreBtn); } else { actions.appendChild(editBtn); actions.appendChild(delBtn); }
+
+    // Check if history exists for this code and update button state
+    const hasHistory = hasHistoryForCode(code);
+    historyBtn.disabled = !hasHistory;
+
+    if(context==="deleted"){
+      actions.appendChild(historyBtn);
+      actions.appendChild(restoreBtn);
+    } else {
+      actions.appendChild(historyBtn);
+      actions.appendChild(editBtn);
+      actions.appendChild(delBtn);
+    }
 
     header.appendChild(badgeWrap); header.appendChild(creator); header.appendChild(actions);
 
@@ -3400,6 +3478,8 @@ function findDeletedElementByCode(code){
     item.addEventListener("click",(e)=>{ if(!selecting) return; if(e.target.closest('.item-actions')) return; toggleSelectForCorrelation(item); });
 
     badge.addEventListener("keydown", e=>{ if(selecting){ e.preventDefault(); toggleSelectForCorrelation(item); return; } if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggleExpandItem(item); } });
+
+    historyBtn.addEventListener("click",(e)=>{ e.stopPropagation(); if(!historyBtn.disabled){ viewHistoryForCode(code); } });
 
     editBtn.addEventListener("click",(e)=>{ e.stopPropagation(); const payload=JSON.parse(item.dataset.payload); const column=inferOriginFromCode(payload.code); openForm(column,payload); $("#codeEditRow").style.display="flex"; const prefix=payload.code.startsWith("AIS")?"AIS":payload.code[0].toUpperCase(); const num=payload.code.replace(/^AIS|^[A-Za-z]/,""); $("#codePrefix").value=prefix; $("#codeNumber").value=num; editingItem=item; });
 

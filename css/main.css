@@ -90,6 +90,8 @@ user-select: text;
   .icon-edit { background: var(--ok); } .icon-edit:hover { background: var(--okH); }
   .icon-delete { background: var(--danger); } .icon-delete:hover { background: var(--dangerH); }
   .icon-restore { background: var(--ok); } .icon-restore:hover { background: var(--okH); }
+  .icon-history { background: #2196F3; } .icon-history:hover { background: #1976D2; }
+  .icon-history:disabled { background: #9e9e9e; cursor: not-allowed; opacity: 0.6; }
 
   .item-details { display:none; flex-wrap:wrap; gap:8px 16px; line-height:1.3; margin-top:6px; align-items:center; }
   .item.expanded .item-details { display:flex; }
