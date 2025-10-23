@@ -2147,8 +2147,7 @@ const weatherTile = document.getElementById("tileWeather");
       const list = document.getElementById("missionTimelineItems");
       if (list) {
         const el = createTimelineItem(payload);
-        if (list.firstChild) list.insertBefore(el, list.firstChild);
-        else list.appendChild(el);
+        insertTimelineItemSorted(list, el);
         dirty = true;
         requestAutoSyncSave(true);
         showBanner(`${label} logged to Mission Timeline.`);
@@ -2288,8 +2287,7 @@ if (repinForm) {
         lastModified: now
       };
       const el = createTimelineItem(payload);
-      if (list.firstChild) list.insertBefore(el, list.firstChild);
-      else list.appendChild(el);
+      insertTimelineItemSorted(list, el);
       dirty = true;
       requestAutoSyncSave(true);
       showBanner("Re-pin logged.");
@@ -2371,25 +2369,7 @@ if (missionLogForm) {
 
       if (list) {
         const el = createTimelineItem(payload);
-
-        // Insert in chronological order (newest first)
-        const existingItems = Array.from(list.children);
-        let inserted = false;
-        for (const item of existingItems) {
-          try {
-            const itemPayload = JSON.parse(item.dataset.payload || "{}");
-            const itemTime = itemPayload.timeHHMM || "";
-            if (timeVal > itemTime) {
-              list.insertBefore(el, item);
-              inserted = true;
-              break;
-            }
-          } catch {}
-        }
-
-        if (!inserted) {
-          list.appendChild(el);
-        }
+        insertTimelineItemSorted(list, el);
 
         dirty = true;
         requestAutoSyncSave(true);
@@ -2464,11 +2444,10 @@ if (timelineFaultForm) {
         comments: commentsVal,
         createdBy: crewPosition || "",
         createdAt: now,
-        lastModified: now
+      lastModified: now
       };
       const el = createTimelineItem(payload);
-      if (container.firstChild) container.insertBefore(el, container.firstChild);
-      else container.appendChild(el);
+      insertTimelineItemSorted(container, el);
       dirty = true;
       requestAutoSyncSave(true);
       showBanner("Fault logged to Mission Timeline.");
@@ -2743,8 +2722,7 @@ if (odForm) {
     const list = document.getElementById("missionTimelineItems");
     if (list) {
       const el = createTimelineItem(payload);
-      if (list.firstChild) list.insertBefore(el, list.firstChild);
-      else list.appendChild(el);
+      insertTimelineItemSorted(list, el);
     }
     dirty = true;
     requestAutoSyncSave(true);
@@ -2874,8 +2852,7 @@ const payload = {
 const list = document.getElementById("missionTimelineItems");
 if (list) {
   const el = createTimelineItem(payload);
-  if (list.firstChild) list.insertBefore(el, list.firstChild);
-  else list.appendChild(el);
+  insertTimelineItemSorted(list, el);
 }
 dirty = true;
 requestAutoSyncSave(true);
@@ -3106,8 +3083,7 @@ window.addEventListener("message", (evt) => {
     const list = document.getElementById("missionTimelineItems");
     if (list) {
       const el = createTimelineItem(payload);
-      if (list.firstChild) list.insertBefore(el, list.firstChild);
-      else list.appendChild(el);
+      insertTimelineItemSorted(list, el);
     }
     dirty = true;
     requestAutoSyncSave(true);
@@ -3494,11 +3470,13 @@ if (mtlList) { mtlList.innerHTML = ""; }
 
   refreshAllAbbrevBadges();
        if (Array.isArray(state.missionTimeline)) {
-      const sortedMTL = state.missionTimeline.slice().sort((a,b)=> Number(b.createdAt||0) - Number(a.createdAt||0));
+      const sortedMTL = state.missionTimeline.slice().sort(compareTimelinePayloadDesc);
       const containerMTL = document.getElementById("missionTimelineItems");
       if (containerMTL) {
         sortedMTL.forEach(p => {
-          try { containerMTL.appendChild(createTimelineItem(p)); }
+          try {
+            containerMTL.appendChild(createTimelineItem(p));
+          }
           catch(e){ console.warn("missionTimeline skip:", e); }
         });
         updateRepinTracker();
@@ -4289,26 +4267,80 @@ window._timelineEntryType = "ONSTA";
 window._editingTimelineFaultItem = null;
 window._editingTimelineRepinItem = null;
 
-function updateTimelineItem(item, p){
-  const formattedPos = formatPositionFromPayload(p);
-  if (formattedPos) p.positionFmt = formattedPos;
-  else delete p.positionFmt;
-  item.dataset.payload = JSON.stringify(p);
+function updateTimelineItemLegacy(item, p){
+  updateTimelineItem(item, p);
+}
 
-  // Header pieces
+function timelineSortKey(payload){
+  const timeDigits = String(payload?.timeHHMM || "").replace(/\D/g,"");
+  const timeVal = (timeDigits.length === 4) ? Number(timeDigits) : -1;
+  const time = Number.isFinite(timeVal) ? timeVal : -1;
+  const createdRaw = Number(payload?.createdAt || 0);
+  const created = Number.isFinite(createdRaw) ? createdRaw : 0;
+  return { time, created };
+}
+
+function compareTimelinePayloadDesc(a, b){
+  const ka = timelineSortKey(a);
+  const kb = timelineSortKey(b);
+  if (ka.time !== kb.time) return kb.time - ka.time;
+  if (ka.created !== kb.created) return kb.created - ka.created;
+  return 0;
+}
+
+function insertTimelineItemSorted(list, item){
+  if (!list || !item) return;
+  let payload;
+  try { payload = JSON.parse(item.dataset.payload || "{}"); }
+  catch { payload = {}; }
+
+  const children = Array.from(list.children);
+  for (const existing of children){
+    let existingPayload;
+    try { existingPayload = JSON.parse(existing.dataset.payload || "{}"); }
+    catch { existingPayload = {}; }
+
+    if (compareTimelinePayloadDesc(payload, existingPayload) < 0){
+      list.insertBefore(item, existing);
+      return;
+    }
+  }
+  list.appendChild(item);
+}
+
+function repositionTimelineItem(item){
+  if (!item) return;
+  const parent = item.parentElement;
+  if (!parent) return;
+  parent.removeChild(item);
+  insertTimelineItemSorted(parent, item);
+}
+
+function updateTimelineItem(item, payload){
+  if (!item) return;
+  let prevPayload;
+  try { prevPayload = JSON.parse(item.dataset.payload || "{}"); }
+  catch { prevPayload = {}; }
+
+  const next = { ...(payload || {}) };
+  const formattedPos = formatPositionFromPayload(next);
+  if (formattedPos) next.positionFmt = formattedPos;
+  else delete next.positionFmt;
+  item.dataset.payload = JSON.stringify(next);
+
   const badgeWrap = item.querySelector(".item-header .badge-wrap");
   const pm = badgeWrap ? badgeWrap.querySelector(".pm") : null;
   const timeBadge = badgeWrap ? badgeWrap.querySelector(".badge-time") : null;
   const typeBadge = badgeWrap ? badgeWrap.querySelector(".badge-type") : null;
   const faultBadge = badgeWrap ? badgeWrap.querySelector(".badge-fault") : null;
-  if (timeBadge) timeBadge.textContent = (p.timeHHMM ? `${p.timeHHMM}Z` : "-");
-  if (typeBadge) typeBadge.textContent = (p.type || "-");
+  if (timeBadge) timeBadge.textContent = (next.timeHHMM ? `${next.timeHHMM}Z` : "-");
+  if (typeBadge) typeBadge.textContent = (next.type || "-");
   if (faultBadge) {
-    if (p.type === "FAULT" && (p.fault || p.fault === "")) {
-      faultBadge.textContent = p.fault ? String(p.fault) : "(No fault code)";
+    if (next.type === "FAULT" && (next.fault || next.fault === "")) {
+      faultBadge.textContent = next.fault ? String(next.fault) : "(No fault code)";
       faultBadge.style.display = "";
-    } else if (p.type === "REPIN") {
-      faultBadge.textContent = p.associatedFault ? String(p.associatedFault) : "(No associated fault)";
+    } else if (next.type === "REPIN") {
+      faultBadge.textContent = next.associatedFault ? String(next.associatedFault) : "(No associated fault)";
       faultBadge.style.display = "";
     } else {
       faultBadge.style.display = "none";
@@ -4316,21 +4348,18 @@ function updateTimelineItem(item, p){
     }
   }
 
-  // Creator line
   const creator = item.querySelector(".creator");
   if (creator) {
-    const when = isValidDate(new Date(p.createdAt))
-      ? `${fmtDateNoYearUTC(new Date(p.createdAt))} ${fmtTimeUTC(new Date(p.createdAt))}`
+    const when = isValidDate(new Date(next.createdAt))
+      ? `${fmtDateNoYearUTC(new Date(next.createdAt))} ${fmtTimeUTC(new Date(next.createdAt))}`
       : "";
-    const by = p.createdBy || "";
-    creator.textContent = [by, when].filter(Boolean).join(" • ");
+    const by = next.createdBy || "";
+    creator.textContent = [by, when].filter(Boolean).join(" | ");
   }
 
-  // Details (expanded)
   const details = item.querySelector(".item-details");
   details.innerHTML = "";
 
-  // Copy button
   const copyBtn = document.createElement("button");
   copyBtn.type = "button";
   copyBtn.className = "copy-pill";
@@ -4338,20 +4367,20 @@ function updateTimelineItem(item, p){
   copyBtn.addEventListener("click", async (e)=>{
     e.stopPropagation();
     const parts = [];
-    if (p.timeHHMM) parts.push(`Time: ${p.timeHHMM}Z`);
-    if (p.type === "OFFDECK" && p.airfield) {
-      parts.push(`Airfield: ${p.airfield}`);
-    } else if (p.type === "ONSTA" || p.type === "OFFSTA") {
-      const posStr = buildPosDisplay(p);
+    if (next.timeHHMM) parts.push(`Time: ${next.timeHHMM}Z`);
+    if (next.type === "OFFDECK" && next.airfield) {
+      parts.push(`Airfield: ${next.airfield}`);
+    } else if (next.type === "ONSTA" || next.type === "OFFSTA") {
+      const posStr = buildPosDisplay(next);
       if (posStr) parts.push(`Pos: ${posStr}`);
-      if (p.altitude) parts.push(`Alt: ${p.altitude}`);
-    } else if (p.type === "MISSIONLOG" && p.comments) {
-      parts.push(`Comments: ${p.comments}`);
-    } else if (p.type === "FAULT") {
-      if (p.fault) parts.push(`Fault: ${p.fault}`);
-      if (p.comments) parts.push(`Comments: ${p.comments}`);
-    } else if (p.type === "REPIN") {
-      if (p.associatedFault) parts.push(`Associated Fault: ${p.associatedFault}`);
+      if (next.altitude) parts.push(`Alt: ${next.altitude}`);
+    } else if (next.type === "MISSIONLOG" && next.comments) {
+      parts.push(`Comments: ${next.comments}`);
+    } else if (next.type === "FAULT") {
+      if (next.fault) parts.push(`Fault: ${next.fault}`);
+      if (next.comments) parts.push(`Comments: ${next.comments}`);
+    } else if (next.type === "REPIN") {
+      if (next.associatedFault) parts.push(`Associated Fault: ${next.associatedFault}`);
     }
     const text = parts.join(" / ");
     try {
@@ -4369,26 +4398,30 @@ function updateTimelineItem(item, p){
   firstRow.appendChild(copyBtn);
   details.appendChild(firstRow);
 
-  // Details rows
-  if (p.type === "OFFDECK" && p.airfield) {
-    details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Airfield:</em> ${escapeHtml(p.airfield)}</span>`);
-  } else if (p.type === "ONSTA" || p.type === "OFFSTA") {
-    const posStr = buildPosDisplay(p);
+  if (next.type === "OFFDECK" && next.airfield) {
+    details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Airfield:</em> ${escapeHtml(next.airfield)}</span>`);
+  } else if (next.type === "ONSTA" || next.type === "OFFSTA") {
+    const posStr = buildPosDisplay(next);
     if (posStr) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Pos:</em> ${escapeHtml(posStr)}</span>`);
-    if (p.altitude) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Alt:</em> ${escapeHtml(String(p.altitude))}</span>`);
-  } else if (p.type === "MISSIONLOG") {
-    if (p.comments) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Comments:</em> ${escapeHtml(p.comments)}</span>`);
-  } else if (p.type === "FAULT") {
-    if (p.comments) {
-      details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Comments:</em> ${escapeHtml(p.comments)}</span>`);
+    if (next.altitude) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Alt:</em> ${escapeHtml(String(next.altitude))}</span>`);
+  } else if (next.type === "MISSIONLOG") {
+    if (next.comments) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Comments:</em> ${escapeHtml(next.comments)}</span>`);
+  } else if (next.type === "FAULT") {
+    if (next.comments) {
+      details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Comments:</em> ${escapeHtml(next.comments)}</span>`);
     }
-  } else if (p.type === "REPIN") {
-    if (p.associatedFault) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Associated Fault:</em> ${escapeHtml(p.associatedFault)}</span>`);
+  } else if (next.type === "REPIN") {
+    if (next.associatedFault) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Associated Fault:</em> ${escapeHtml(next.associatedFault)}</span>`);
   }
 
-  updateRepinTracker();
-}
+  if (pm) pm.textContent = item.classList.contains("expanded") ? "�^'" : "+";
 
+  updateRepinTracker();
+
+  if (compareTimelinePayloadDesc(next, prevPayload) !== 0){
+    repositionTimelineItem(item);
+  }
+}
 function createTimelineItem(p){
   const item = document.createElement("div");
   const formattedPos = formatPositionFromPayload(p);
@@ -4633,7 +4666,7 @@ const when = isValidDate(new Date(p.createdAt))
   ? `${fmtDateNoYearUTC(new Date(p.createdAt))} ${fmtTimeUTC(new Date(p.createdAt))}`
   : "";
 
-creator.textContent = [by, when].filter(Boolean).join(" • ");
+creator.textContent = [by, when].filter(Boolean).join(" | ");
 
 const details = document.createElement("div");
 details.className = "item-details";
@@ -4788,7 +4821,7 @@ function updateWeatherItem(item, p){
       ? `${fmtDateNoYearUTC(new Date(p.createdAt))} ${fmtTimeUTC(new Date(p.createdAt))}`
       : "";
     const by = p.createdBy || "";
-    creator.textContent = [by, when].filter(Boolean).join(" • ");
+    creator.textContent = [by, when].filter(Boolean).join(" | ");
   }
 
   // Rebuild details
@@ -5047,7 +5080,7 @@ function updateCont1Item(item, p){
       ? `${fmtDateNoYearUTC(new Date(p.createdAt))} ${fmtTimeUTC(new Date(p.createdAt))}`
       : "";
     const by = p.createdBy || "";
-    creator.textContent = [by, when].filter(Boolean).join(" • ");
+    creator.textContent = [by, when].filter(Boolean).join(" | ");
   }
 
   const details = item.querySelector(".item-details");
@@ -6178,10 +6211,5 @@ function buildAbbrevList(p){
 
 
 })();
-
-
-
-
-
 
 
