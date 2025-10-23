@@ -381,6 +381,30 @@
         <input type="checkbox" class="abbrChk" data-field="vesselType" title="Include in abbreviation">
       </div>
 
+      <label for="vesselName" class="ais-only" style="display:none;">Vessel Name</label>
+      <div class="row tight inline-check ais-only" style="display:none;">
+        <input type="text" id="vesselName" placeholder="e.g., EVER GIVEN">
+        <input type="checkbox" class="abbrChk" data-field="vesselName" title="Include in abbreviation">
+      </div>
+
+      <label for="mmsi" class="ais-only" style="display:none;">MMSI</label>
+      <div class="row tight inline-check ais-only" style="display:none;">
+        <input type="text" id="mmsi" placeholder="e.g., 123456789" inputmode="numeric" pattern="[0-9]{9}" maxlength="9">
+        <input type="checkbox" class="abbrChk" data-field="mmsi" title="Include in abbreviation">
+      </div>
+
+      <label for="vesselFlag" class="ais-only" style="display:none;">Vessel Flag</label>
+      <div class="row tight inline-check ais-only" style="display:none;">
+        <input type="text" id="vesselFlag" placeholder="e.g., Panama">
+        <input type="checkbox" class="abbrChk" data-field="vesselFlag" title="Include in abbreviation">
+      </div>
+
+      <label for="imo" class="ais-only" style="display:none;">IMO</label>
+      <div class="row tight inline-check ais-only" style="display:none;">
+        <input type="text" id="imo" placeholder="e.g., 9319466" inputmode="numeric" pattern="[0-9]{7}" maxlength="7">
+        <input type="checkbox" class="abbrChk" data-field="imo" title="Include in abbreviation">
+      </div>
+
       <label for="sensor">Sensor</label>
       <div class="row tight inline-check">
         <input type="text" id="sensor" placeholder="e.g., Radar, EO/IR">

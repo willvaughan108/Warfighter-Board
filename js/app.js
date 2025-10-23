@@ -129,12 +129,12 @@ let reportedFlag = false; // form-level flag synced with #reportedBtn
   let selecting = false;
   const selectedCodes = new Set();
 
-const ALLOWED_ABBREV_FIELDS = ["time","vesselType","sensor","position","course","speed","trackNumber","minVesselLen","systemOrPlatform","emitterName","activityOrFunction","frequency","additionalInfo"];
+const ALLOWED_ABBREV_FIELDS = ["time","vesselType","vesselName","sensor","mmsi","vesselFlag","imo","position","course","speed","trackNumber","minVesselLen","systemOrPlatform","emitterName","activityOrFunction","frequency","additionalInfo"];
 const TACREP_TYPES = ["India","Echo","AIS","Alpha","November","Golf","Other"];
 const DEFAULT_TACREP_FIELD_ORDER = {
   Echo: ["callsign","timeHHMM","systemOrPlatform","emitterName","activityOrFunction","frequency","position","course","speed","trackNumber","minVesselLen","additionalInfo"],
   India: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo"],
-  AIS: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo"],
+  AIS: ["timeHHMM","vesselType","vesselName","mmsi","position","course","speed","trackNumber","vesselFlag","imo","additionalInfo"],
   Alpha: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo"],
   November: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo"],
   Golf: ["callsign","timeHHMM","position","vesselType","sensor","course","speed","trackNumber","minVesselLen","additionalInfo"],
@@ -188,10 +188,20 @@ const TACREP_FIELD_DEFS = {
     settingsLabel: "Vessel Type",
     getValue: payload => (payload?.vesselType || "")
   },
+  vesselName: {
+    label: "Name",
+    settingsLabel: "Vessel Name",
+    getValue: payload => (payload?.vesselName || "")
+  },
   sensor: {
     label: "Sensor",
     settingsLabel: "Sensor",
     getValue: payload => (payload?.sensor || "")
+  },
+  mmsi: {
+    label: "MMSI",
+    settingsLabel: "MMSI",
+    getValue: payload => (payload?.mmsi || "")
   },
   course: {
     label: "Course",
@@ -208,10 +218,20 @@ const TACREP_FIELD_DEFS = {
     settingsLabel: "Track Number",
     getValue: payload => (payload?.trackNumber || "")
   },
+  vesselFlag: {
+    label: "Flag",
+    settingsLabel: "Vessel Flag",
+    getValue: payload => (payload?.vesselFlag || "")
+  },
   minVesselLen: {
     label: "MinLen",
     settingsLabel: "Min Vessel Length",
     getValue: payload => (payload?.minVesselLen || "")
+  },
+  imo: {
+    label: "IMO",
+    settingsLabel: "IMO",
+    getValue: payload => (payload?.imo || "")
   },
   additionalInfo: {
     label: "Info",
@@ -550,6 +570,10 @@ const hhmm   = get("timeZuluInput").replace(/\D/g,"").slice(0,4);
 const course = get("course").replace(/\D/g,"").slice(0,3);
 const speed  = get("speed").replace(/[^0-9.]/g,"");
 const minLen = get("minVesselLen").replace(/\D/g,"");
+const vesselName = get("vesselName");
+const mmsi = get("mmsi").replace(/\D/g,"").slice(0,9);
+const vesselFlag = get("vesselFlag");
+const imo = get("imo").replace(/\D/g,"").slice(0,7);
 
 // DMS fields (keep as strings; validation handled elsewhere in app)
 const latDeg = get("latDeg").replace(/\D/g,"");
@@ -593,7 +617,11 @@ return num ? `${num} ${unit}` : "";
 
 // Standard fields (used by India/others; hidden for Echo via UI)
 vesselType: get("vesselType"),
+vesselName,
 sensor: get("sensor"),
+mmsi,
+vesselFlag,
+imo,
 
 // Position (DMS + compatibility fields)
 latDeg, latMin, latSec, latDecSecStr, latDecMinStr, latHem,
@@ -1029,6 +1057,10 @@ function fillEntryFormFromPayload(p){
   set("timeZuluInput", p.timeHHMM || "");
   // Standard fields
   set("vesselType", p.vesselType);
+  set("vesselName", p.vesselName);
+  set("mmsi", p.mmsi);
+  set("vesselFlag", p.vesselFlag);
+  set("imo", p.imo);
   set("sensor", p.sensor);
   set("course", p.course);
   set("speed", p.speed);
@@ -1476,23 +1508,31 @@ if (lab) lab.style.display = on ? "none" : "";
 function configureEntryFormForColumn(){
 const col = (document.getElementById("targetColumn")?.value || "");
 const isEcho = (col === "Echo");
+const isAIS = (col === "AIS");
 
 // Toggle Echo-only fields
 document.querySelectorAll(".echo-only").forEach(el=>{
   el.style.display = isEcho ? "" : "none";
 });
+// Toggle AIS-only fields
+document.querySelectorAll(".ais-only").forEach(el=>{
+  el.style.display = isAIS ? "" : "none";
+});
 
 // Hide standard fields that Echo must NOT use
-const toHide = ["vesselType","sensor","course","speed","trackNumber","minVesselLen","minotaurPaste"];
-toHide.forEach(id => hideBlockByInputId(id, isEcho));
+const hideEcho = ["vesselType","sensor","course","speed","trackNumber","minVesselLen","minotaurPaste"];
+hideEcho.forEach(id => hideBlockByInputId(id, isEcho));
+// Hide fields not needed for AIS entries
+const hideAIS = ["sensor","minVesselLen","minotaurPaste"];
+hideAIS.forEach(id => hideBlockByInputId(id, isAIS));
 
 // Ensure Minotaur Parse button row is hidden if Echo
 const minoBtn = document.getElementById("minoCheckBtn");
 if (minoBtn) {
   const minoRow = minoBtn.closest(".row");
-  if (minoRow) minoRow.style.display = isEcho ? "none" : "";
+  if (minoRow) minoRow.style.display = (isEcho || isAIS) ? "none" : "";
   const minoLabel = document.querySelector('label[for="minotaurPaste"]');
-  if (minoLabel) minoLabel.style.display = isEcho ? "none" : "";
+  if (minoLabel) minoLabel.style.display = (isEcho || isAIS) ? "none" : "";
 }
 
 // Refresh abbreviation checkbox enablement/state
@@ -1655,6 +1695,8 @@ clampDigitsInput($("#blockInput"));
 clampDigitsInput(document.getElementById("md_blockStart"));
 clampDigitsInput($("#codeNumber"));
 clampDigitsInput($("#minVesselLen"));
+clampDigitsInput($("#mmsi"), 9);
+clampDigitsInput($("#imo"), 7);
 clampDigitsInput($("#faultTime"));
 clampDigitsInput($("#tfTime"));
 
@@ -3607,6 +3649,10 @@ state.changeHistory = changeHistory;
 
     $("#timeZuluInput").value = data?.timeHHMM ?? "";
     $("#vesselType").value    = data?.vesselType ?? "";
+    $("#vesselName").value    = data?.vesselName ?? "";
+    $("#mmsi").value          = data?.mmsi ?? "";
+    $("#vesselFlag").value    = data?.vesselFlag ?? "";
+    $("#imo").value           = data?.imo ?? "";
     $("#sensor").value        = data?.sensor ?? "";
 
     // DMS fields
@@ -3670,7 +3716,13 @@ rb.style.fontWeight = "bold";
   if(t && (t.length!==4 || Number(t.slice(0,2))>23 || Number(t.slice(2,4))>59)){ alert("Time must be HHMM Zulu."); return; }
 
   const vesselType=$("#vesselType").value.trim();
+  const vesselName=$("#vesselName").value.trim();
   const sensor=$("#sensor").value.trim();
+  let mmsi = digitsOnly($("#mmsi").value).slice(0,9);
+  $("#mmsi").value = mmsi;
+  const vesselFlag=$("#vesselFlag").value.trim();
+  let imo = digitsOnly($("#imo").value).slice(0,7);
+  $("#imo").value = imo;
 
   // DMS inputs (entry form)
   const latDegStr = digitsOnly($("#latDeg").value);
@@ -3764,10 +3816,13 @@ rb.style.fontWeight = "bold";
     const payloadBase=editingItem ? JSON.parse(editingItem.dataset.payload) : {};
     const payload={
       ...payloadBase,
-      code:finalCode, timeHHMM:t, vesselType, sensor,
+      code:finalCode, timeHHMM:t, vesselType, vesselName, sensor,
       // Store both DMS pieces and legacy minute-fraction for existing renderers/exports
       latDeg:latDegStr, latMin:latMinStr, latSec:latSecStr, latDecSecStr:latDecSecStr, latDecMinStr:latDecMinStrCompat, latHem,
       lonDeg:lonDegStr, lonMin:lonMinStr, lonSec:lonSecStr, lonDecSecStr:lonDecSecStr, lonDecMinStr:lonDecMinStrCompat, lonHem,
+      mmsi,
+      vesselFlag,
+      imo,
       course, speed:speedVal, trackNumber, minVesselLen, info,
       minotaurPaste,
       reported,
@@ -4180,6 +4235,10 @@ function findDeletedElementByCode(code){
       const parts=[code];
       if(p.timeHHMM) parts.push(`Time: ${p.timeHHMM}Z`);
       if(p.vesselType) parts.push(`Vessel: ${p.vesselType}`);
+      if(p.vesselName) parts.push(`Name: ${p.vesselName}`);
+      if(p.mmsi) parts.push(`MMSI: ${p.mmsi}`);
+      if(p.vesselFlag) parts.push(`Flag: ${p.vesselFlag}`);
+      if(p.imo) parts.push(`IMO: ${p.imo}`);
       if(p.sensor) parts.push(`Sensor: ${p.sensor}`);
       const posStr=buildPosDisplay(p); if(posStr) parts.push(`Pos: ${posStr}`);
       if(p.course) parts.push(`Course: ${p.course}`);
@@ -4197,6 +4256,10 @@ function findDeletedElementByCode(code){
     firstRow.appendChild(copyBtn);
     if(p.timeHHMM) firstRow.insertAdjacentHTML("beforeend", ` <em>Time:</em> ${escapeHtml(p.timeHHMM)}Z`);
     if(p.vesselType) rows.push(`<span class="detail"><em>Vessel:</em> ${escapeHtml(p.vesselType)}</span>`);
+    if(p.vesselName) rows.push(`<span class="detail"><em>Name:</em> ${escapeHtml(p.vesselName)}</span>`);
+    if(p.mmsi) rows.push(`<span class="detail"><em>MMSI:</em> ${escapeHtml(p.mmsi)}</span>`);
+    if(p.vesselFlag) rows.push(`<span class="detail"><em>Flag:</em> ${escapeHtml(p.vesselFlag)}</span>`);
+    if(p.imo) rows.push(`<span class="detail"><em>IMO:</em> ${escapeHtml(p.imo)}</span>`);
     if(p.sensor) rows.push(`<span class="detail"><em>Sensor:</em> ${escapeHtml(p.sensor)}</span>`);
     const posStr=buildPosDisplay(p);
     if(posStr) rows.push(`<span class="detail"><em>Pos:</em> ${escapeHtml(posStr)}</span>`);
@@ -6099,6 +6162,10 @@ function buildAbbrevList(p){
   const sel=abbrevPrefs;
     if(sel.includes("time")&&p.timeHHMM){ out.push(`${p.timeHHMM}Z`); }
     if(sel.includes("vesselType")&&p.vesselType){ out.push(String(p.vesselType)); }
+    if(sel.includes("vesselName")&&p.vesselName){ out.push(String(p.vesselName)); }
+    if(sel.includes("mmsi")&&p.mmsi){ out.push(`MMSI ${p.mmsi}`); }
+    if(sel.includes("vesselFlag")&&p.vesselFlag){ out.push(String(p.vesselFlag)); }
+    if(sel.includes("imo")&&p.imo){ out.push(`IMO ${p.imo}`); }
     if(sel.includes("sensor")&&p.sensor){ out.push(String(p.sensor)); }
     if(sel.includes("position")){ const pos=buildPosCompact(p); if(pos) out.push(pos); }
     if(sel.includes("course")&&p.course){ out.push(String(p.course)); }
