@@ -3211,9 +3211,10 @@ document.getElementById("faultTime").value = `${pad2(d.getUTCHours())}${pad2(d.g
     }, POLL_MS);
 
     // Suggestion form
-    $("#sb-cancel").addEventListener("click", ()=> closeModal($("#suggestionModal")));
-    $("#suggestionForm").addEventListener("submit", onSuggestionSave);
-    ["sb-suggestion","sb-name","sb-email"].forEach(id=> $("#"+id).addEventListener("input", ()=> validateSuggestion(false)));
+    const sbCancel = $("#sb-cancel");
+    if (sbCancel) sbCancel.addEventListener("click", ()=> closeModal($("#suggestionModal")));
+    const suggestionFormEl = $("#suggestionForm");
+    if (suggestionFormEl) suggestionFormEl.addEventListener("submit", (e)=>{ e.preventDefault(); closeModal($("#suggestionModal")); });
   });
 
   // ---- Crew / Block ----
@@ -5940,14 +5941,26 @@ const state=gatherStateFromDOM();
 const types=["India","Echo","AIS","Alpha","November","Golf"];
 const present=types.filter(t=> (state.columns[t]||[]).length>0);
 
-// Build a map from TACREP code -> array of correlation group strings ("I12+E3+AIS5")
-const codeToGroups = {};
-(state.correlations || []).forEach(entry=>{
-const group = (entry.codes || []).slice().sort((a,b)=>a.localeCompare(b)).join("+");
-(entry.codes || []).forEach(code=>{
-if(!codeToGroups[code]) codeToGroups[code] = [];
-codeToGroups[code].push(group);
+function correlationLabel(code){ const raw = String(code||""); if(!raw) return ""; if(raw.toUpperCase().startsWith("AIS")){ const numeric = raw.slice(3).trim(); return numeric ? `AIS ${numeric}` : "AIS"; } const type = tacrepTypeFromCode(raw); if(!type || type === "Other") return raw; let numeric = raw.replace(/^[A-Za-z]+/, "").trim(); return numeric ? `${type.toUpperCase()} ${numeric}` : type.toUpperCase(); }
+
+const correlationMap = {};
+(state.correlations || []).forEach(entry => {
+  const codes = (entry.codes || []).map(c => String(c || "")).filter(Boolean).sort((a,b)=>a.localeCompare(b));
+  codes.forEach(code => {
+    if (!correlationMap[code]) correlationMap[code] = [];
+  });
+  codes.forEach(code => {
+    codes.forEach(other => {
+      if (other === code) return;
+      const label = correlationLabel(other);
+      if (label && !correlationMap[code].includes(label)) {
+        correlationMap[code].push(label);
+      }
+    });
+  });
 });
+Object.keys(correlationMap).forEach(code => {
+  correlationMap[code].sort((a,b)=>a.localeCompare(b));
 });
 
 const style = `body{font-family:Arial,sans-serif;margin:0;background:#f5f7fb;color:#111}
@@ -6003,8 +6016,9 @@ win.document.write(`<!doctype html><html><head><title>Export CSV</title><meta ch
 </div>
 
 <script>
-  const state = ${JSON.stringify(gatherStateFromDOM())};
-  const codeToGroups = ${JSON.stringify(codeToGroups)};
+  const state = ${JSON.stringify(state)};
+  const codeToGroups = ${JSON.stringify(correlationMap)};
+
 
   function d(s){ return String(s||'').replace(/\\D/g,''); }
   function buildPos(p){
@@ -6021,8 +6035,8 @@ win.document.write(`<!doctype html><html><head><title>Export CSV</title><meta ch
   function selectedTypes(){ return Array.from(document.querySelectorAll('.typeCb')).filter(cb=>cb.checked).map(cb=>cb.value); }
   function corrStringFor(code){
     const arr = codeToGroups[code] || [];
-    const uniq = Array.from(new Set(arr)).sort();
-    return uniq.join(' ; ');
+    if (!arr.length) return '';
+    return arr.join(', ');
   }
 
   // ----- Build & render TACREPs
@@ -6157,32 +6171,6 @@ document.getElementById('previewCD').style.display = includeCD ? '' : 'none';
 
 win.document.close();
 }
-
-
-  // ---- Suggestion Box ----
-  function validateSuggestion(showErrors){
-    const sWrap=$("#sb-suggestion-wrap"), nWrap=$("#sb-name-wrap"), eWrap=$("#sb-email-wrap");
-    const sHelp=$("#sb-suggestion-help"), nHelp=$("#sb-name-help"), eHelp=$("#sb-email-help");
-    const sVal=$("#sb-suggestion").value.trim(), nVal=$("#sb-name").value.trim(), eVal=$("#sb-email").value.trim();
-    let ok=true;
-    if(!sVal){ ok=false; sWrap.classList.add("error"); sHelp.style.display="block"; } else { sWrap.classList.remove("error"); sHelp.style.display="none"; }
-    if(!nVal){ ok=false; nWrap.classList.add("error"); nHelp.style.display="block"; } else { nWrap.classList.remove("error"); nHelp.style.display="none"; }
-       const safeDomain = String(typeof EMAIL_DOMAIN !== "undefined" ? (EMAIL_DOMAIN || "") : "").replace(/\./g, '\\.');
-    const emailRx = safeDomain
-      ? new RegExp(`^[^@\\s]+@${safeDomain}$`, 'i')
-      : /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
-
-    if(!emailRx.test(eVal)){ ok=false; eWrap.classList.add("error"); eHelp.style.display="block"; } else { eWrap.classList.remove("error"); eHelp.style.display="none"; }
-    return ok;
-  }
-  function onSuggestionSave(e){
-    e.preventDefault();
-    if(!validateSuggestion(true)) return;
-    const rec={ suggestion: $("#sb-suggestion").value.trim(), name: $("#sb-name").value.trim(), email: $("#sb-email").value.trim(), createdBy: crewPosition || "", createdAt: Date.now() };
-    suggestions.push(rec); dirty=true; requestAutoSyncSave(true); showBanner("Suggestion saved.");
-    closeModal($("#suggestionModal"));
-  }
-
   // ---- Abbrev content ----
 function buildAbbrevList(p){
   const out=[];
@@ -6211,5 +6199,9 @@ function buildAbbrevList(p){
 
 
 })();
+
+
+
+
 
 

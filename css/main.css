@@ -35,7 +35,9 @@
   /* Landing */
   #landing { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height: 100vh; gap:14px; }
   #landing h1 { padding:0; }
+  .landing-warning { color:#c62828; }
   .landing-buttons { display:flex; gap:10px; }
+  .contact-message { line-height:1.6; text-align:center; white-space:pre-line; }
 
   /* App shell */
   #app { display:none; padding: 0 20px 20px; }

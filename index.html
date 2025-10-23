@@ -29,6 +29,7 @@
 <input id="fileOpenFallback" type="file" accept="application/json" style="display:none">
 
 <section id="landing">
+  <h1 class="landing-warning">NOT APPROVED FOR USE</h1>
   <h1>Warfighter Board <span class="ver" id="versionA">v0.90</span></h1>
   <div class="landing-buttons">
     <button id="btnLandingNew" type="button">New Mission</button>
@@ -496,28 +497,15 @@
 <div id="suggestionModal" class="modal" aria-hidden="true">
   <div class="content" role="dialog" aria-modal="true" aria-labelledby="sbTitle">
     <h3 id="sbTitle">Suggestion Box</h3>
-    <form id="suggestionForm" novalidate="">
-      <div class="sb-field" id="sb-suggestion-wrap">
-        <label for="sb-suggestion">Suggestion <span class="sb-required">(required)</span></label>
-        <textarea id="sb-suggestion" placeholder="Share your suggestion..."></textarea>
-        <div class="sb-help" id="sb-suggestion-help" style="display:none;">Suggestion is required.</div>
+    <form id="suggestionForm">
+      <div class="contact-message">
+        For questions or suggestions:<br>
+        LT William Vaughan<br>
+        VP30<br>
+        William.E.Vaughn45.mil@us.navy.mil
       </div>
-
-      <div class="sb-field" id="sb-name-wrap">
-        <label for="sb-name">Name <span class="sb-required">(required)</span></label>
-        <input id="sb-name" type="text" placeholder="Your name">
-        <div class="sb-help" id="sb-name-help" style="display:none;">Name is required.</div>
-      </div>
-
-      <div class="sb-field" id="sb-email-wrap">
-        <label for="sb-email">Navy Email <span class="sb-required">(required, must end with @us.navy.mil)</span></label>
-      <input id="sb-email" type="email" placeholder="your.name@us.navy.mil" pattern=".*@us\.navy\.mil$" required>
-        <div class="sb-help" id="sb-email-help" style="display:none;">Valid Navy email ending with @us.navy.mil is required.</div>
-      </div>
-
       <div class="actions" style="margin-top:12px;">
         <button type="button" id="sb-cancel" class="btn-secondary">Close</button>
-        <button type="submit" id="sb-save">Save</button>
       </div>
     </form>
   </div>
