@@ -77,14 +77,15 @@
     <button class="tab"         role="tab" id="tabMD"  aria-controls="panelMD"  data-tab-target="MD"  aria-selected="false">Mission Details</button>
 <button class="tab active"  role="tab" id="tabTC"  aria-controls="panelTC"  data-tab-target="TC"  aria-selected="true">TACREPs</button>
 
-<button class="tab"         role="tab" id="tabMPO" aria-controls="panelMPO" data-tab-target="MPO" aria-selected="false">LOG</button>
+    <button class="tab"         role="tab" id="tabMPO" aria-controls="panelMPO" data-tab-target="MPO" aria-selected="false">LOG</button>
+    <span id="repinTracker" class="muted" aria-live="polite" style="margin-left:auto;">BAR Re-Pins This Mission: 0</span>
   </div>
 
   <!-- Panel: TC (your existing board, unchanged markup inside) -->
 <!-- Panel: MD (placeholder or future content) -->
 <div class="tab-panel" role="tabpanel" id="panelMD" data-tab="MD" aria-labelledby="tabMD"> <div class="board" id="mdBoard"> <div class="column" data-column="MissionDetails"> <h2>Mission Details</h2> <div class="items"> <div class="item" id="crewDetailsTile" aria-label="Mission Details"> <div class="item-header"> <div class="badge-wrap"> <div class="badge">Mission Details</div> </div> <div class="item-actions"></div> </div> <div class="item-details"> <div class="cd-grid" style="width:100%;"> <!-- Header row --> <div class="cd-row cd-head"> <div class="hdr" id="md_hdr_shift">Shift</div> <div class="hdr" id="md_hdr_turn">Turnover time</div> <div class="hdr" id="md_hdr_mc">MC</div> <div class="hdr" id="md_hdr_tc">TC</div> <div class="hdr" id="md_hdr_uac">UAC</div> <div class="hdr" id="md_hdr_sc">SC</div> <div class="hdr" id="md_hdr_mpo1">MPO1</div> <div class="hdr" id="md_hdr_mpo2">MPO2</div> </div> <!-- Mission Meta (separate from Crew Details) --> <div id="md_meta_wrap"> <!-- Mission number and block start are intentionally placed above the crew details and always visible --> <div class="row tight">
   <label for="md_callsign">Callsign</label>
-   <input id="md_callsign" type="text" placeholder="Callsign" aria-label="Callsign" maxlength="7">
+   <input id="md_callsign" type="text" placeholder="Callsign" aria-label="Callsign" maxlength="20">
 
 </div>
 
@@ -221,6 +222,7 @@
           </div>
           <div class="mtl-controls row tight" style="gap:8px; margin-top:8px;">
             <button type="button" id="mtl_FAULTS">Faults</button>
+            <button type="button" id="mtl_REPIN">Log a Re-pin</button>
             <button type="button" id="mtl_MISSIONLOG">Mission Log</button>
           </div>
           <div id="missionTimelineItems"></div>
@@ -501,6 +503,8 @@
     <h3 id="settingsTitle">Settings</h3>
     <div class="settings-body">
       <button type="button" id="openTacrepFormatBtn">TACREP Format</button>
+      <button type="button" id="openPositionFormatBtn">Position Format</button>
+      <div class="muted" id="positionFormatSummary" style="margin-top:8px;"></div>
     </div>
     <div class="actions">
       <button type="button" id="settingsCloseBtn" class="btn-secondary">Close</button>
@@ -516,6 +520,45 @@
       <button type="button" id="tacrepFormatCancelBtn" class="btn-secondary">Close</button>
       <button type="button" id="tacrepFormatResetBtn">Reset to Default</button>
     </div>
+  </div>
+</div>
+<div id="positionFormatModal" class="modal" aria-hidden="true">
+  <div class="content" role="dialog" aria-modal="true" aria-labelledby="positionFormatTitle">
+    <h3 id="positionFormatTitle">Position Format</h3>
+    <form id="positionFormatForm">
+      <div class="position-format-option">
+        <label>
+          <input type="radio" name="positionFormatChoice" value="MGRS">
+          <strong>MGRS</strong> — Military Grid Reference System<br>
+          <span class="muted">Format: grid zone + 100 km square + easting northing (e.g., 18SUJ 23480 06470)</span>
+        </label>
+      </div>
+      <div class="position-format-option" style="margin-top:10px;">
+        <label>
+          <input type="radio" name="positionFormatChoice" value="DMS">
+          <strong>DMS</strong> — Degrees Minutes Seconds<br>
+          <span class="muted">Format: DD&deg; MM&prime; SS&Prime; (e.g., 36&deg; 51&prime; 31&Prime; N, 121&deg; 45&prime; 15&Prime; W)</span>
+        </label>
+      </div>
+      <div class="position-format-option" style="margin-top:10px;">
+        <label>
+          <input type="radio" name="positionFormatChoice" value="DM.M">
+          <strong>DM.M</strong> — Degrees and decimal minutes<br>
+          <span class="muted">Format: DD&deg; MM.mmm&prime; (e.g., 36&deg; 51.528&prime; N, 121&deg; 45.253&prime; W)</span>
+        </label>
+      </div>
+      <div class="position-format-option" style="margin-top:10px;">
+        <label>
+          <input type="radio" name="positionFormatChoice" value="D.DD">
+          <strong>D.DD</strong> — Decimal degrees<br>
+          <span class="muted">Format: DD.dddddd&deg; (e.g., 36.8588&deg; N, &minus;121.7542&deg;)</span>
+        </label>
+      </div>
+      <div class="actions" style="margin-top:12px;">
+        <button type="button" id="positionFormatCancelBtn" class="btn-secondary">Cancel</button>
+        <button type="submit" id="positionFormatSaveBtn">Save</button>
+      </div>
+    </form>
   </div>
 </div>
 <div id="crewDetailsModal" class="modal" aria-hidden="true">
@@ -624,7 +667,24 @@
     </div>
   </div>
 </div>
-
+<div id="repinModal" class="modal" aria-hidden="true">
+  <div class="content" role="dialog" aria-modal="true" aria-labelledby="repinTitle">
+    <h3 id="repinTitle">Log a Re-pin</h3>
+    <form id="repinForm">
+      <label for="repinTime">Time (Zulu)</label>
+      <div class="row tight" style="gap:8px;">
+        <input id="repinTime" type="text" placeholder="HHMM" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required>
+        <button id="repinTimeCurrent" type="button" class="btn-secondary">Current</button>
+      </div>
+      <label for="repinFault">Associated Fault</label>
+      <input id="repinFault" type="text" placeholder="Fault code or description">
+      <div class="actions" style="margin-top:12px;">
+        <button id="repinCancel" type="button" class="btn-secondary">Cancel</button>
+        <button id="repinSave" type="submit">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
 <!-- Mission Log Modal -->
 <div id="missionLogModal" class="modal" aria-hidden="true">
   <div class="content" role="dialog" aria-modal="true" aria-labelledby="missionLogTitle">
@@ -734,5 +794,6 @@
 
 
 </body></html>
+
 
 

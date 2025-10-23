@@ -86,6 +86,15 @@ let reportedFlag = false; // form-level flag synced with #reportedBtn
   let changeHistoryEntries = [];
   let suggestions = [];
   let tacrepFormatPrefs = loadTacrepFormatPrefs();
+  const POSITION_FORMAT_STORAGE_KEY = "wf_position_format";
+  const POSITION_FORMATS = [
+    { id:"MGRS", label:"MGRS" },
+    { id:"DMS", label:"DMS" },
+    { id:"DM.M", label:"DM.M" },
+    { id:"D.DD", label:"D.DD" }
+  ];
+  const DEFAULT_POSITION_FORMAT = "DM.M";
+  let positionFormat = loadPositionFormatPref();
   let exportCsvUrl = null;
   const DEBUG_HISTORY = false;
   function normalizeHistoryEntry(raw){
@@ -238,6 +247,45 @@ function saveTacrepFormatPrefs(){
   try {
     localStorage.setItem(TACREP_FORMAT_STORAGE_KEY, JSON.stringify(tacrepFormatPrefs));
   } catch {}
+}
+
+function sanitizePositionFormat(value){
+  const id = String(value || "").toUpperCase();
+  return POSITION_FORMATS.find(fmt => fmt.id === id)?.id || null;
+}
+
+function loadPositionFormatPref(){
+  try {
+    const raw = localStorage.getItem(POSITION_FORMAT_STORAGE_KEY);
+    const sanitized = sanitizePositionFormat(raw);
+    return sanitized || DEFAULT_POSITION_FORMAT;
+  } catch {
+    return DEFAULT_POSITION_FORMAT;
+  }
+}
+
+function savePositionFormatPref(){
+  try {
+    localStorage.setItem(POSITION_FORMAT_STORAGE_KEY, positionFormat);
+  } catch {}
+}
+
+function updatePositionFormatSummary(){
+  const summary = document.getElementById("positionFormatSummary");
+  if (summary) {
+    const label = POSITION_FORMATS.find(fmt => fmt.id === positionFormat)?.label || positionFormat;
+    summary.textContent = `Current format: ${label}`;
+  }
+}
+
+function applyPositionFormat(newFormat, options){
+  const fmt = sanitizePositionFormat(newFormat) || DEFAULT_POSITION_FORMAT;
+  const shouldSave = !options || options.save !== false;
+  const shouldRefresh = !options || options.refresh !== false;
+  positionFormat = fmt;
+  if (shouldSave) savePositionFormatPref();
+  updatePositionFormatSummary();
+  if (shouldRefresh) refreshAllPositionDisplays();
 }
 
 function getTacrepFieldOrder(type){
@@ -393,6 +441,50 @@ function refreshAllTacrepDetails(){
       renderTacrepDetailsInto(item);
     }
   });
+}
+
+function refreshAllPositionDisplays(){
+  refreshAllTacrepDetails();
+
+  document.querySelectorAll("#missionTimelineItems .item").forEach(item => {
+    try {
+      const payload = JSON.parse(item.dataset.payload || "{}");
+      updateTimelineItem(item, payload);
+    } catch {}
+  });
+
+  document.querySelectorAll("#weatherItems .item").forEach(item => {
+    try {
+      const payload = JSON.parse(item.dataset.payload || "{}");
+      updateWeatherItem(item, payload);
+    } catch {}
+  });
+
+  const faultContainer = document.getElementById("faultItems");
+  if (faultContainer) {
+    Array.from(faultContainer.children).forEach(item => {
+      try {
+        const payload = JSON.parse(item.dataset.payload || "{}");
+        const replacement = createFaultItem(payload);
+        item.replaceWith(replacement);
+      } catch {}
+    });
+  }
+  updateRepinTracker();
+}
+
+function updateRepinTracker(){
+  const tracker = document.getElementById("repinTracker");
+  if (!tracker) return;
+  const items = document.querySelectorAll("#missionTimelineItems .item");
+  let count = 0;
+  items.forEach(item=>{
+    try {
+      const payload = JSON.parse(item.dataset.payload || "{}");
+      if ((payload?.type || "").toUpperCase() === "REPIN") count += 1;
+    } catch {}
+  });
+  tracker.textContent = `BAR Re-Pins This Mission: ${count}`;
 }
 
 function handleTacrepFormatClick(e){
@@ -729,7 +821,7 @@ timelineItems.forEach(p=>{
   timelineRows.push([
     p.timeHHMM||"",
     p.type||"",
-    p.airfield||"",
+    (p.type === "REPIN" ? (p.associatedFault || "") : (p.airfield||"")),
     lat,
     lon,
     p.altitude||"",
@@ -1290,10 +1382,14 @@ renderTacrepDetailsInto = function(item, payload) {
     const settingsBtn = $("#settingsBtn");
     const settingsModal = $("#settingsModal");
     const tacrepFormatModal = $("#tacrepFormatModal");
+    const positionFormatModal = $("#positionFormatModal");
     const settingsCloseBtn = $("#settingsCloseBtn");
     const openTacrepFormatBtn = $("#openTacrepFormatBtn");
+    const openPositionFormatBtn = $("#openPositionFormatBtn");
     const tacrepFormatCancelBtn = $("#tacrepFormatCancelBtn");
     const tacrepFormatResetBtn = $("#tacrepFormatResetBtn");
+    const positionFormatCancelBtn = $("#positionFormatCancelBtn");
+    const positionFormatForm = $("#positionFormatForm");
     if (settingsBtn && settingsModal) {
       settingsBtn.addEventListener("click", ()=> openModal(settingsModal));
     }
@@ -1307,6 +1403,17 @@ renderTacrepDetailsInto = function(item, payload) {
         openModal(tacrepFormatModal);
       });
     }
+    if (openPositionFormatBtn && positionFormatModal) {
+      openPositionFormatBtn.addEventListener("click", ()=>{
+        if (settingsModal) closeModal(settingsModal);
+        if (positionFormatForm) {
+          positionFormatForm.querySelectorAll('input[name="positionFormatChoice"]').forEach(radio => {
+            radio.checked = (radio.value === positionFormat);
+          });
+        }
+        openModal(positionFormatModal);
+      });
+    }
     if (tacrepFormatCancelBtn && tacrepFormatModal) {
       tacrepFormatCancelBtn.addEventListener("click", ()=> closeModal(tacrepFormatModal));
     }
@@ -1317,11 +1424,26 @@ renderTacrepDetailsInto = function(item, payload) {
         refreshAllTacrepDetails();
       });
     }
+    if (positionFormatCancelBtn && positionFormatModal) {
+      positionFormatCancelBtn.addEventListener("click", ()=> closeModal(positionFormatModal));
+    }
+    if (positionFormatForm && positionFormatModal) {
+      positionFormatForm.addEventListener("submit", (e)=>{
+        e.preventDefault();
+        const selected = positionFormatForm.querySelector('input[name="positionFormatChoice"]:checked');
+        if (selected) {
+          applyPositionFormat(selected.value);
+        }
+        closeModal(positionFormatModal);
+      });
+    }
     const tfContainer = $("#tacrepFormatContainer");
     if (tfContainer) tfContainer.addEventListener("click", handleTacrepFormatClick);
 
     $("#cancelEntryBtn").addEventListener("click", ()=> closeForm());
 $("#makeCurrentBtn").addEventListener("click", ()=>{ const d=new Date(); $("#timeZuluInput").value = `${pad2(d.getUTCHours())}${pad2(d.getUTCMinutes())}`; });
+    applyPositionFormat(positionFormat, { save:false });
+    updateRepinTracker();
     /* Configure entry form when opening for Echo vs others */
 (function installEchoFormConfigurator(){
 const entry = document.getElementById("entryModal");
@@ -1708,7 +1830,6 @@ function logChangeHistory(kind /* "correct"|"update"|"edit" */, code, by, tacrep
   }
 }
 
-// Create a simple history row
 function createHistoryItem(p){
   const el = document.createElement("div");
   el.className = "item";
@@ -2043,6 +2164,16 @@ if (timelineFaultBtn) {
 }
 
 // Mission Log button handler
+const repinBtn = document.getElementById("mtl_REPIN");
+if (repinBtn) {
+  repinBtn.addEventListener("click", ()=> {
+    document.getElementById("repinTime").value = "";
+    document.getElementById("repinFault").value = "";
+    window._editingTimelineRepinItem = null;
+    openModal(document.getElementById("repinModal"));
+  });
+}
+
 const missionLogBtn = document.getElementById("mtl_MISSIONLOG");
 if (missionLogBtn) {
   missionLogBtn.addEventListener("click", ()=> {
@@ -2051,6 +2182,80 @@ if (missionLogBtn) {
     document.getElementById("mlComments").value = "";
     window._editingMissionLogItem = null;
     openModal(document.getElementById("missionLogModal"));
+  });
+}
+
+const repinTimeCurrentBtn = document.getElementById("repinTimeCurrent");
+if (repinTimeCurrentBtn) {
+  repinTimeCurrentBtn.addEventListener("click", ()=> {
+    const d = new Date();
+    document.getElementById("repinTime").value = `${pad2(d.getUTCHours())}${pad2(d.getUTCMinutes())}`;
+  });
+}
+
+const repinCancelBtn = document.getElementById("repinCancel");
+if (repinCancelBtn) {
+  repinCancelBtn.addEventListener("click", ()=>{
+    window._editingTimelineRepinItem = null;
+    closeModal(document.getElementById("repinModal"));
+  });
+}
+
+const repinForm = document.getElementById("repinForm");
+if (repinForm) {
+  repinForm.addEventListener("submit", (e)=>{
+    e.preventDefault();
+    const timeVal = (document.getElementById("repinTime").value || "").trim().replace(/\D/g,"").slice(0,4);
+    if (!timeVal || timeVal.length !== 4) {
+      alert("Enter time in HHMM format.");
+      return;
+    }
+    const hh = Number(timeVal.slice(0,2));
+    const mm = Number(timeVal.slice(2,4));
+    if (hh > 23 || mm > 59) {
+      alert("Invalid time. Hours must be 0-23 and minutes must be 0-59.");
+      return;
+    }
+    const faultVal = (document.getElementById("repinFault").value || "").trim();
+    const list = document.getElementById("missionTimelineItems");
+    if (!list) {
+      closeModal(document.getElementById("repinModal"));
+      return;
+    }
+    const now = Date.now();
+
+    if (window._editingTimelineRepinItem) {
+      const existing = JSON.parse(window._editingTimelineRepinItem.dataset.payload || "{}");
+      const payload = {
+        ...existing,
+        timeHHMM: timeVal,
+        associatedFault: faultVal,
+        lastModified: now
+      };
+      updateTimelineItem(window._editingTimelineRepinItem, payload);
+      window._editingTimelineRepinItem = null;
+      dirty = true;
+      requestAutoSyncSave(true);
+      showBanner("Re-pin updated.");
+    } else {
+      const payload = {
+        timeHHMM: timeVal,
+        type: "REPIN",
+        associatedFault: faultVal,
+        createdBy: crewPosition || "",
+        createdAt: now,
+        lastModified: now
+      };
+      const el = createTimelineItem(payload);
+      if (list.firstChild) list.insertBefore(el, list.firstChild);
+      else list.appendChild(el);
+      dirty = true;
+      requestAutoSyncSave(true);
+      showBanner("Re-pin logged.");
+    }
+
+    updateRepinTracker();
+    closeModal(document.getElementById("repinModal"));
   });
 }
 
@@ -3255,6 +3460,7 @@ if (mtlList) { mtlList.innerHTML = ""; }
           try { containerMTL.appendChild(createTimelineItem(p)); }
           catch(e){ console.warn("missionTimeline skip:", e); }
         });
+        updateRepinTracker();
       }
     }
 
@@ -3365,7 +3571,11 @@ const faults = Array.from(document.querySelectorAll("#faultItems .item"))
 state.faults = faults;
 
 const missionTimeline = Array.from(document.querySelectorAll("#missionTimelineItems .item"))
-.map(it => JSON.parse(it.dataset.payload || "{}"));
+.map(it => {
+  const payload = JSON.parse(it.dataset.payload || "{}");
+  if (payload && typeof payload === "object") delete payload.positionFmt;
+  return payload;
+});
 state.missionTimeline = missionTimeline;
 // Change History (persist newest-first list)
 const changeHistory = changeHistoryEntries.length
@@ -3978,6 +4188,7 @@ function findDeletedElementByCode(code){
       if(p.trackNumber) parts.push(`Track: ${p.trackNumber}`);
       if(p.minVesselLen) parts.push(`MinLen: ${p.minVesselLen} ft`);
       if(p.info) parts.push(`Info: ${p.info}`);
+      if(p.type === "REPIN" && p.associatedFault) parts.push(`Associated Fault: ${p.associatedFault}`);
       const text=parts.join(" / ");
       try{ await navigator.clipboard.writeText(text); copyBtn.textContent="Copied!"; copyBtn.classList.add("copied"); setTimeout(()=>{ copyBtn.textContent="Copy"; copyBtn.classList.remove("copied"); },1200); }catch{ alert("Copy failed."); }
     });
@@ -3994,7 +4205,8 @@ function findDeletedElementByCode(code){
     if(p.speed!==null && p.speed!=="") rows.push(`<span class="detail"><em>Speed:</em> ${escapeHtml(String(p.speed))} kts</span>`);
     if(p.trackNumber) rows.push(`<span class="detail"><em>Track:</em> ${escapeHtml(p.trackNumber)}</span>`);
     if(p.minVesselLen) rows.push(`<span class="detail"><em>MinLen:</em> ${escapeHtml(p.minVesselLen)} ft</span>`);
-    if(p.info) rows.push(`<span class="detail"><em>Info:</em> ${escapeHtml(p.info)}</span>`);
+      if(p.info) rows.push(`<span class="detail"><em>Info:</em> ${escapeHtml(p.info)}</span>`);
+      if (p.type === "REPIN" && p.associatedFault) rows.push(`<span class="detail"><em>Associated Fault:</em> ${escapeHtml(p.associatedFault)}</span>`);
 
     container.appendChild(firstRow);
     rows.forEach(html=> container.insertAdjacentHTML("beforeend", html));
@@ -4013,8 +4225,12 @@ window._editingTimelineItem = null;
   
 window._timelineEntryType = "ONSTA";
 window._editingTimelineFaultItem = null;
+window._editingTimelineRepinItem = null;
 
 function updateTimelineItem(item, p){
+  const formattedPos = formatPositionFromPayload(p);
+  if (formattedPos) p.positionFmt = formattedPos;
+  else delete p.positionFmt;
   item.dataset.payload = JSON.stringify(p);
 
   // Header pieces
@@ -4028,6 +4244,9 @@ function updateTimelineItem(item, p){
   if (faultBadge) {
     if (p.type === "FAULT" && (p.fault || p.fault === "")) {
       faultBadge.textContent = p.fault ? String(p.fault) : "(No fault code)";
+      faultBadge.style.display = "";
+    } else if (p.type === "REPIN") {
+      faultBadge.textContent = p.associatedFault ? String(p.associatedFault) : "(No associated fault)";
       faultBadge.style.display = "";
     } else {
       faultBadge.style.display = "none";
@@ -4047,66 +4266,72 @@ function updateTimelineItem(item, p){
 
   // Details (expanded)
   const details = item.querySelector(".item-details");
-details.innerHTML = "";
+  details.innerHTML = "";
 
-// Copy button
-const copyBtn = document.createElement("button");
-copyBtn.type = "button";
-copyBtn.className = "copy-pill";
-copyBtn.textContent = "Copy";
-copyBtn.addEventListener("click", async (e)=>{
-  e.stopPropagation();
-  const parts = [];
-  if (p.timeHHMM) parts.push(`Time: ${p.timeHHMM}Z`);
+  // Copy button
+  const copyBtn = document.createElement("button");
+  copyBtn.type = "button";
+  copyBtn.className = "copy-pill";
+  copyBtn.textContent = "Copy";
+  copyBtn.addEventListener("click", async (e)=>{
+    e.stopPropagation();
+    const parts = [];
+    if (p.timeHHMM) parts.push(`Time: ${p.timeHHMM}Z`);
+    if (p.type === "OFFDECK" && p.airfield) {
+      parts.push(`Airfield: ${p.airfield}`);
+    } else if (p.type === "ONSTA" || p.type === "OFFSTA") {
+      const posStr = buildPosDisplay(p);
+      if (posStr) parts.push(`Pos: ${posStr}`);
+      if (p.altitude) parts.push(`Alt: ${p.altitude}`);
+    } else if (p.type === "MISSIONLOG" && p.comments) {
+      parts.push(`Comments: ${p.comments}`);
+    } else if (p.type === "FAULT") {
+      if (p.fault) parts.push(`Fault: ${p.fault}`);
+      if (p.comments) parts.push(`Comments: ${p.comments}`);
+    } else if (p.type === "REPIN") {
+      if (p.associatedFault) parts.push(`Associated Fault: ${p.associatedFault}`);
+    }
+    const text = parts.join(" / ");
+    try {
+      await navigator.clipboard.writeText(text);
+      copyBtn.textContent = "Copied!";
+      copyBtn.classList.add("copied");
+      setTimeout(()=>{ copyBtn.textContent = "Copy"; copyBtn.classList.remove("copied"); },1200);
+    } catch {
+      alert("Copy failed.");
+    }
+  });
+
+  const firstRow = document.createElement("span");
+  firstRow.className = "detail";
+  firstRow.appendChild(copyBtn);
+  details.appendChild(firstRow);
+
+  // Details rows
   if (p.type === "OFFDECK" && p.airfield) {
-    parts.push(`Airfield: ${p.airfield}`);
-   } else if (p.type === "ONSTA" || p.type === "OFFSTA") {
+    details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Airfield:</em> ${escapeHtml(p.airfield)}</span>`);
+  } else if (p.type === "ONSTA" || p.type === "OFFSTA") {
     const posStr = buildPosDisplay(p);
-    if (posStr) parts.push(`Pos: ${posStr}`);
-    if (p.altitude) parts.push(`Alt: ${p.altitude}`);
-  } else if (p.type === "MISSIONLOG" && p.comments) {
-    parts.push(`Comments: ${p.comments}`);
+    if (posStr) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Pos:</em> ${escapeHtml(posStr)}</span>`);
+    if (p.altitude) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Alt:</em> ${escapeHtml(String(p.altitude))}</span>`);
+  } else if (p.type === "MISSIONLOG") {
+    if (p.comments) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Comments:</em> ${escapeHtml(p.comments)}</span>`);
   } else if (p.type === "FAULT") {
-    if (p.fault) parts.push(`Fault: ${p.fault}`);
-    if (p.comments) parts.push(`Comments: ${p.comments}`);
+    if (p.comments) {
+      details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Comments:</em> ${escapeHtml(p.comments)}</span>`);
+    }
+  } else if (p.type === "REPIN") {
+    if (p.associatedFault) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Associated Fault:</em> ${escapeHtml(p.associatedFault)}</span>`);
   }
-  const text = parts.join(" / ");
-  try {
-    await navigator.clipboard.writeText(text);
-    copyBtn.textContent = "Copied!";
-    copyBtn.classList.add("copied");
-    setTimeout(()=>{ copyBtn.textContent = "Copy"; copyBtn.classList.remove("copied"); },1200);
-  } catch {
-    alert("Copy failed.");
-  }
-});
 
-
-const firstRow = document.createElement("span");
-firstRow.className = "detail";
-firstRow.appendChild(copyBtn);
-details.appendChild(firstRow);
-
-// Details rows
-if (p.type === "OFFDECK" && p.airfield) {
-  details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Airfield:</em> ${escapeHtml(p.airfield)}</span>`);
-} else if (p.type === "ONSTA" || p.type === "OFFSTA") {
-
-  const posStr = buildPosDisplay(p);
-  if (posStr) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Pos:</em> ${escapeHtml(posStr)}</span>`);
-  if (p.altitude) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Alt:</em> ${escapeHtml(String(p.altitude))}</span>`);
-} else if (p.type === "MISSIONLOG") {
-  if (p.comments) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Comments:</em> ${escapeHtml(p.comments)}</span>`);
-} else if (p.type === "FAULT") {
-  if (p.comments) {
-    details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Comments:</em> ${escapeHtml(p.comments)}</span>`);
-  }
-}
-
+  updateRepinTracker();
 }
 
 function createTimelineItem(p){
   const item = document.createElement("div");
+  const formattedPos = formatPositionFromPayload(p);
+  if (formattedPos) p.positionFmt = formattedPos;
+  else delete p.positionFmt;
   item.className = "item";
   item.dataset.payload = JSON.stringify(p);
     item._kind = (
@@ -4116,6 +4341,7 @@ function createTimelineItem(p){
   p.type === "OFFSTA"     ? "TIMELINE_OFFSTA"  :
   p.type === "MISSIONLOG" ? "TIMELINE_MISSIONLOG" :
   p.type === "FAULT"      ? "TIMELINE_FAULT" :
+  p.type === "REPIN"      ? "TIMELINE_REPIN" :
   "TIMELINE_GENERIC"
 );
 
@@ -4233,6 +4459,11 @@ openModal(document.getElementById("onStaModal"));
   document.getElementById("tfComments").value = payload.comments || "";
   window._editingTimelineFaultItem = item;
   openModal(document.getElementById("timelineFaultModal"));
+} else if (payload.type === "REPIN") {
+  document.getElementById("repinTime").value = payload.timeHHMM || "";
+  document.getElementById("repinFault").value = payload.associatedFault || "";
+  window._editingTimelineRepinItem = item;
+  openModal(document.getElementById("repinModal"));
 } else {
 alert("Edit not supported for this type (yet).");
 }
@@ -4244,10 +4475,12 @@ alert("Edit not supported for this type (yet).");
       item.remove();
       dirty = true;
       requestAutoSyncSave(true);
+      updateRepinTracker();
     });
   });
 
   updateTimelineItem(item, p);
+  updateRepinTracker();
   return item;
 }
 function flashItemByCode(code){
@@ -4476,6 +4709,9 @@ showBanner("Weather entry saved.");
 }
 
 function updateWeatherItem(item, p){
+  const formattedPos = formatPositionFromPayload(p);
+  if (formattedPos) p.positionFmt = formattedPos;
+  else delete p.positionFmt;
   item.dataset.payload = JSON.stringify(p);
 
   // Update header badges
@@ -4531,6 +4767,9 @@ function updateWeatherItem(item, p){
   if(p.comments)    details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Comments:</em> ${escapeHtml(p.comments)}</span>`);
 }
 function createWeatherItem(p){
+  const formattedPos = formatPositionFromPayload(p);
+  if (formattedPos) p.positionFmt = formattedPos;
+  else delete p.positionFmt;
   const item = document.createElement("div");
   item.className = "item";
   item.dataset.payload = JSON.stringify(p);
@@ -5312,34 +5551,297 @@ correlationCancelBtn.addEventListener("click", ()=> setSelectMode(false));
     return Number(total.toFixed(3));
   }
 
-  function formatPosComponent(degStr, minStr, decMinStr, secStr, decSecStr, hem){
+  const DEG_SYM = "\u00B0";
+  const PRIME = "'";
+  const DOUBLE_PRIME = "\"";
+  const POSITION_LAT_BANDS = "CDEFGHJKLMNPQRSTUVWX";
+  const E100K_LETTERS = ["ABCDEFGH", "JKLMNPQR", "STUVWXYZ"];
+  const N100K_LETTERS = ["ABCDEFGHJKLMNPQRSTUV", "FGHJKLMNPQRSTUVABCDE"];
+
+  function getDecimalDegreesFromParts(degStr, minStr, decMinStr, secStr, decSecStr, hem){
     const degDigits = digitsOnly(degStr);
-    if (degDigits === "" || !hem) return "";
-    const hemUp = String(hem).trim().toUpperCase();
-    if (!hemUp) return "";
-
-    const minutes = computeDecimalMinutes(minStr, decMinStr, secStr, decSecStr);
-    if (minutes === null) return "";
-
-    const degVal = Math.trunc(Number(degDigits) || 0);
-    const minutesStr = minutes.toFixed(3).replace(/\.?0+$/,"");
-    return `${degVal} ${minutesStr} ${hemUp}`;
+    if (degDigits === "") return null;
+    const deg = Number(degDigits);
+    if (!Number.isFinite(deg)) return null;
+    let minutes = computeDecimalMinutes(minStr, decMinStr, secStr, decSecStr);
+    if (minutes === null) minutes = 0;
+    let decimal = deg + (minutes / 60);
+    const hemisphere = String(hem || "").trim().toUpperCase();
+    if (hemisphere === "S" || hemisphere === "W") decimal *= -1;
+    return decimal;
   }
 
-  function buildPosCompact(p){
-    const lat = formatPosComponent(p.latDeg, p.latMin, p.latDecMinStr, p.latSec, p.latDecSecStr, p.latHem);
-    const lon = formatPosComponent(p.lonDeg, p.lonMin, p.lonDecMinStr, p.lonSec, p.lonDecSecStr, p.lonHem);
+  function getDecimalLatLon(p){
+    const lat = getDecimalDegreesFromParts(p.latDeg, p.latMin, p.latDecMinStr, p.latSec, p.latDecSecStr, p.latHem);
+    const lon = getDecimalDegreesFromParts(p.lonDeg, p.lonMin, p.lonDecMinStr, p.lonSec, p.lonDecSecStr, p.lonHem);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    return { lat, lon };
+  }
+
+  function hemisphereLetter(value, isLat){
+    if (isLat) return value >= 0 ? "N" : "S";
+    return value >= 0 ? "E" : "W";
+  }
+
+  function formatDMSComponent(value, isLat){
+    const abs = Math.abs(value);
+    let deg = Math.floor(abs);
+    let minutesFloat = (abs - deg) * 60;
+    let minutes = Math.floor(minutesFloat);
+    let seconds = Math.round((minutesFloat - minutes) * 60);
+    if (seconds === 60) {
+      seconds = 0;
+      minutes += 1;
+    }
+    if (minutes === 60) {
+      minutes = 0;
+      deg += 1;
+    }
+    const padDeg = isLat ? 2 : 3;
+    return `${String(deg).padStart(padDeg, "0")}${DEG_SYM} ${String(minutes).padStart(2,"0")}${PRIME} ${String(seconds).padStart(2,"0")}${DOUBLE_PRIME} ${hemisphereLetter(value, isLat)}`;
+  }
+
+  function formatDMmComponent(value, isLat){
+    const abs = Math.abs(value);
+    const deg = Math.floor(abs);
+    const minutes = (abs - deg) * 60;
+    const padDeg = isLat ? 2 : 3;
+    return `${String(deg).padStart(padDeg, "0")}${DEG_SYM} ${minutes.toFixed(3).padStart(6,"0")}${PRIME} ${hemisphereLetter(value, isLat)}`;
+  }
+
+  function formatDecimalComponent(value, isLat){
+    const abs = Math.abs(value);
+    return `${abs.toFixed(6)}${DEG_SYM} ${hemisphereLetter(value, isLat)}`;
+  }
+
+  function formatDMmFromPartsSingle(degStr, minStr, decMinStr, secStr, decSecStr, hem, isLat){
+    const degDigits = digitsOnly(degStr);
+    if (degDigits === "") return "";
+    const degVal = Number(degDigits);
+    if (!Number.isFinite(degVal)) return "";
+    let minutes = computeDecimalMinutes(minStr, decMinStr, secStr, decSecStr);
+    if (minutes === null) minutes = 0;
+    const padDeg = isLat ? 2 : 3;
+    const hemi = String(hem || "").trim().toUpperCase() || (isLat ? "N" : "E");
+    return `${String(Math.trunc(degVal)).padStart(padDeg, "0")}${DEG_SYM} ${minutes.toFixed(3)}${PRIME} ${hemi}`;
+  }
+
+  function formatDMmFromPartsFallback(p){
+    const lat = formatDMmFromPartsSingle(p.latDeg, p.latMin, p.latDecMinStr, p.latSec, p.latDecSecStr, p.latHem, true);
+    const lon = formatDMmFromPartsSingle(p.lonDeg, p.lonMin, p.lonDecMinStr, p.lonSec, p.lonDecSecStr, p.lonHem, false);
     return (lat && lon) ? `${lat}, ${lon}` : "";
   }
 
+  function formatDMmPair(lat, lon){
+    return `${formatDMmComponent(lat, true)}, ${formatDMmComponent(lon, false)}`;
+  }
+
+  function formatDmsPair(lat, lon){
+    return `${formatDMSComponent(lat, true)}, ${formatDMSComponent(lon, false)}`;
+  }
+
+  function formatDecimalPair(lat, lon){
+    return `${formatDecimalComponent(lat, true)}, ${formatDecimalComponent(lon, false)}`;
+  }
+
+  function getZoneLetter(lat){
+    if (lat > 84 || lat < -80) return null;
+    const index = Math.floor((lat + 80) / 8);
+    return POSITION_LAT_BANDS[Math.min(Math.max(index, 0), POSITION_LAT_BANDS.length - 1)];
+  }
+
+  function adjustZoneNumber(lat, lon, zoneNumber){
+    if (lat >= 56 && lat < 64 && lon >= 3 && lon < 12) return 32;
+    if (lat >= 72 && lat < 84) {
+      if      (lon >= 0  && lon < 9 ) return 31;
+      else if (lon >= 9  && lon < 21) return 33;
+      else if (lon >= 21 && lon < 33) return 35;
+      else if (lon >= 33 && lon < 42) return 37;
+    }
+    return zoneNumber;
+  }
+
+  function get100kSetForZone(zoneNumber){
+    let set = zoneNumber % 6;
+    if (set === 0) set = 6;
+    return set;
+  }
+
+  function getEasting100kLetter(set, column){
+    const letters = E100K_LETTERS[(set - 1) % 3];
+    const index = (column - 1) % letters.length;
+    return letters.charAt(index);
+  }
+
+  function getNorthing100kLetter(set, row){
+    const letters = N100K_LETTERS[(set - 1) % 2];
+    const index = row % letters.length;
+    return letters.charAt(index);
+  }
+
+  function getMinNorthing(zoneLetter){
+    switch(zoneLetter){
+      case "C": return 1100000;
+      case "D": return 2000000;
+      case "E": return 2800000;
+      case "F": return 3700000;
+      case "G": return 4600000;
+      case "H": return 5500000;
+      case "J": return 6400000;
+      case "K": return 7300000;
+      case "L": return 8200000;
+      case "M": return 9100000;
+      case "N": return 0;
+      case "P": return 800000;
+      case "Q": return 1700000;
+      case "R": return 2600000;
+      case "S": return 3500000;
+      case "T": return 4400000;
+      case "U": return 5300000;
+      case "V": return 6200000;
+      case "W": return 7000000;
+      case "X": return 7900000;
+      default: return 0;
+    }
+  }
+
+  function latLonToUTM(lat, lon){
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    if (lat > 84 || lat < -80) return null;
+
+    const a = 6378137.0;
+    const f = 1 / 298.257223563;
+    const k0 = 0.9996;
+    const eSq = f * (2 - f);
+    const eccPrimeSq = eSq / (1 - eSq);
+    const degToRad = Math.PI / 180;
+
+    let zoneNumber = Math.floor((lon + 180) / 6) + 1;
+    zoneNumber = adjustZoneNumber(lat, lon, zoneNumber);
+
+    const zoneLetter = getZoneLetter(lat);
+    if (!zoneLetter) return null;
+
+    const lonOrigin = (zoneNumber - 1) * 6 - 180 + 3;
+    const latRad = lat * degToRad;
+    const lonRad = lon * degToRad;
+    const lonOriginRad = lonOrigin * degToRad;
+
+    const sinLat = Math.sin(latRad);
+    const cosLat = Math.cos(latRad);
+    const tanLat = Math.tan(latRad);
+
+    const N = a / Math.sqrt(1 - eSq * sinLat * sinLat);
+    const T = tanLat * tanLat;
+    const C = eccPrimeSq * cosLat * cosLat;
+    const A = cosLat * (lonRad - lonOriginRad);
+
+    const M = a * (
+      (1 - eSq/4 - 3*eSq*eSq/64 - 5*eSq*eSq*eSq/256) * latRad
+      - (3*eSq/8 + 3*eSq*eSq/32 + 45*eSq*eSq*eSq/1024) * Math.sin(2*latRad)
+      + (15*eSq*eSq/256 + 45*eSq*eSq*eSq/1024) * Math.sin(4*latRad)
+      - (35*eSq*eSq*eSq/3072) * Math.sin(6*latRad)
+    );
+
+    const easting = k0 * N * (
+      A + (1 - T + C) * Math.pow(A,3) / 6 + (5 - 18*T + T*T + 72*C - 58*eccPrimeSq) * Math.pow(A,5) / 120
+    ) + 500000.0;
+
+    let northing = k0 * (
+      M + N * tanLat * (
+        Math.pow(A,2)/2 + (5 - T + 9*C + 4*C*C) * Math.pow(A,4)/24 + (61 - 58*T + T*T + 600*C - 330*eccPrimeSq) * Math.pow(A,6)/720
+      )
+    );
+
+    if (lat < 0) northing += 10000000.0;
+
+    return { zoneNumber, zoneLetter, easting, northing };
+  }
+
+  function get100kGridLetters(zoneNumber, easting, northing, zoneLetter){
+    const set = get100kSetForZone(zoneNumber);
+    const columnValue = Math.floor(easting / 100000);
+    let northingValue = northing;
+    const minNorth = getMinNorthing(zoneLetter);
+    while (northingValue < minNorth) northingValue += 2000000;
+    const rowValue = Math.floor(northingValue / 100000);
+    const columnLetter = getEasting100kLetter(set, columnValue);
+    const rowLetter = getNorthing100kLetter(set, rowValue);
+    return columnLetter + rowLetter;
+  }
+
+  function latLonToMGRS(lat, lon){
+    const utm = latLonToUTM(lat, lon);
+    if (!utm) return "";
+    const { zoneNumber, zoneLetter, easting, northing } = utm;
+    const grid = get100kGridLetters(zoneNumber, easting, northing, zoneLetter);
+    let eRemainder = Math.round(easting % 100000);
+    let nRemainder = Math.round(northing % 100000);
+    if (eRemainder === 100000) eRemainder = 0;
+    if (nRemainder === 100000) nRemainder = 0;
+    return `${zoneNumber}${zoneLetter} ${grid} ${String(eRemainder).padStart(5,"0")} ${String(nRemainder).padStart(5,"0")}`;
+  }
+
+  function formatPositionWithFormat(p, formatOverride){
+    const fmt = sanitizePositionFormat(formatOverride) || positionFormat;
+    if (fmt === "MGRS") {
+      const coords = getDecimalLatLon(p);
+      if (!coords) return "";
+      return latLonToMGRS(coords.lat, coords.lon);
+    }
+    const coords = getDecimalLatLon(p);
+    if (fmt === "DM.M") {
+      if (coords) return formatDMmPair(coords.lat, coords.lon);
+      return formatDMmFromPartsFallback(p);
+    }
+    if (!coords) return "";
+    switch (fmt) {
+      case "DMS":
+        return formatDmsPair(coords.lat, coords.lon);
+      case "D.DD":
+        return formatDecimalPair(coords.lat, coords.lon);
+      default:
+        return formatDMmPair(coords.lat, coords.lon);
+    }
+  }
+
+  function formatPositionFromPayload(p, override){
+    if (!p || typeof p !== "object") return "";
+    return formatPositionWithFormat(p, override);
+  }
+
+  function buildPosCompact(p){
+    return formatPositionWithFormat(p);
+  }
+
   function buildPosDisplay(p){
-    return buildPosCompact(p);
+    return formatPositionWithFormat(p);
+  }
+
+  function annotatePositionsForFormat(stateObj, fmt){
+    if (!stateObj || typeof stateObj !== "object") return;
+    const formatList = (list)=>{
+      if (!Array.isArray(list)) return;
+      list.forEach(rec=>{
+        if (rec && typeof rec === "object") {
+          const formatted = formatPositionWithFormat(rec, fmt);
+          if (formatted) rec.positionFmt = formatted;
+          else delete rec.positionFmt;
+        }
+      });
+    };
+    if (stateObj.columns && typeof stateObj.columns === "object") {
+      Object.values(stateObj.columns).forEach(formatList);
+    }
+    formatList(stateObj.weather);
+    formatList(stateObj.missionTimeline);
   }
 
  // ---- Export ----
 function openExportWindow(){
 const win=window.open("", "wf_export", "width=920,height=760"); if(!win){ alert("Pop-up blocked. Please allow pop-ups for Export."); return; }
 const state=gatherStateFromDOM();
+    annotatePositionsForFormat(state, positionFormat);
 const types=["India","Echo","AIS","Alpha","November","Golf"];
 const present=types.filter(t=> (state.columns[t]||[]).length>0);
 
@@ -5411,14 +5913,14 @@ win.document.write(`<!doctype html><html><head><title>Export CSV</title><meta ch
 
   function d(s){ return String(s||'').replace(/\\D/g,''); }
   function buildPos(p){
+    if (p && typeof p.positionFmt === 'string' && p.positionFmt) return p.positionFmt;
     function fmt(minStr,decStr){ const mm=d(minStr); const dec=d(decStr||''); const num=mm===''?0:Number(mm); const dn=dec===''?0:Number('0.'+dec); const total=num+dn; return total.toFixed(3).padStart(6, total<10?'0':''); }
     const latD=d(p.latDeg), latM=d(p.latMin), lonD=d(p.lonDeg), lonM=d(p.lonMin);
     if(latD===''||latM===''||!p.latHem||lonD===''||lonM===''||!p.lonHem) return '';
     const latDStr=String(Math.trunc(Number(latD)||0)).padStart(2,'0');
     const lonDStr=String(Math.trunc(Number(lonD)||0)).padStart(3,'0');
     const latMStr=fmt(p.latMin,p.latDecMinStr), lonMStr=fmt(p.lonMin,p.lonDecMinStr);
-    // NOTE: no degree symbol here to avoid mojibake in some CSV viewers
-    return \`\${latDStr} \${latMStr}' \${p.latHem}, \${lonDStr} \${lonMStr}' \${p.lonHem}\`;
+    return latDStr + ':' + latMStr + (p.latHem || '') + ', ' + lonDStr + ':' + lonMStr + (p.lonHem || '');
   }
 
   function selectedTypes(){ return Array.from(document.querySelectorAll('.typeCb')).filter(cb=>cb.checked).map(cb=>cb.value); }
@@ -5610,5 +6112,10 @@ function buildAbbrevList(p){
 
 
 })();
+
+
+
+
+
 
 
