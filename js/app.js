@@ -111,6 +111,19 @@ let reportedFlag = false; // form-level flag synced with #reportedBtn
   function cloneHistoryEntry(entry){
     return normalizeHistoryEntry(entry);
   }
+  function createHistoryItem(p){
+    const el = document.createElement("div");
+    el.className = "item";
+    el.dataset.payload = JSON.stringify(p);
+    el.dataset.historyId = p.id || "";
+    el.innerHTML = `
+      <div class="item-header">
+        <div class="creator">${escapeHtml(p.line || "")}</div>
+        <div class="item-actions"></div>
+      </div>
+    `;
+    return el;
+  }
   let pendingMode = null;
   let pendingTacrepColumn = null; // Track which TACREP column user tried to add to before Block Start was set
   let selecting = false;
@@ -1828,20 +1841,6 @@ function logChangeHistory(kind /* "correct"|"update"|"edit" */, code, by, tacrep
   if (typeof updateAllHistoryButtons === 'function') {
     updateAllHistoryButtons();
   }
-}
-
-function createHistoryItem(p){
-  const el = document.createElement("div");
-  el.className = "item";
-  el.dataset.payload = JSON.stringify(p);
-  el.dataset.historyId = p.id || "";
-  el.innerHTML = `
-    <div class="item-header">
-      <div class="creator">${escapeHtml(p.line || "")}</div>
-      <div class="item-actions"></div>
-    </div>
-  `;
-  return el;
 }
 
 // ===== Hook the existing Edit form submission to branch for Correct/Update =====
