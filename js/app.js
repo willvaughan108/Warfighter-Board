@@ -273,10 +273,10 @@ function nextHighest(prefix){
   let selecting = false;
 
   const selectedCodes = new Set();
+  let changeTypeSendRequired = false;
+
   let _changeMode = null;          // "edit" | "correct" | "update" | null
   let _changeContext = null;       // { itemEl, payload }
-
-
 
 const ALLOWED_ABBREV_FIELDS = ["time","vesselType","vesselName","sensor","mmsi","vesselFlag","imo","tq","amplification","ivo","majorAxis","minorAxis","orientation","bearing","ownshipPosit","position","course","speed","trackNumber","minVesselLen","systemOrPlatform","emitterName","activityOrFunction","frequency","additionalInfo"];
 const ALLOWED_ABBREV_SET = new Set(ALLOWED_ABBREV_FIELDS);
@@ -3114,6 +3114,7 @@ function openForm(columnName, existingPayload /* can be null */){
   targetCol.value = effectiveType;
 
   setCurrentAbbrevType(effectiveType);
+  changeTypeSendRequired = false;
 
   if (modal) modal.dataset.tacrep = effectiveType;
 
@@ -3211,7 +3212,8 @@ function openForm(columnName, existingPayload /* can be null */){
 
 // Close + clean up helper
 
-function closeForm(){
+function closeForm(options={}){
+  const { preserveChangeMode=false } = options;
 
   const modal = document.getElementById("entryModal");
 
@@ -3231,6 +3233,12 @@ function closeForm(){
   entryFormBaseline="";
   entryFormDirty=false;
   applyEntrySaveState();
+
+  if (!preserveChangeMode){
+    _changeMode = null;
+    _changeContext = null;
+    changeTypeSendRequired = false;
+  }
 }
 
 
@@ -4268,7 +4276,7 @@ clampDigitsInput($("#tfTime"));
 
 // Add New buttons (delegated) -- gate on Block Start
 
- // ===== TACREP Edit Pencil: pre-edit chooser (Edit / Correct / Update) =====
+// ===== TACREP Edit Pencil: pre-edit chooser (Edit / Correct / Update) =====
 
 
 
@@ -4283,6 +4291,7 @@ function openChangeTypeChooser(itemEl){
     _changeContext = { itemEl, payload };
 
     _changeMode = null;
+    changeTypeSendRequired = false;
 
     openModal(document.getElementById("changeTypeModal"));
 
@@ -4295,6 +4304,7 @@ function openChangeTypeChooser(itemEl){
     if (p) closeModal(p);
 
     _changeMode = "edit";
+    changeTypeSendRequired = false;
 
     // Fallback open
 
@@ -4322,13 +4332,13 @@ function openChangeTypeChooser(itemEl){
 
   const btnX = document.getElementById("btnChangeTypeCancel");
 
-  if (btnE) btnE.onclick = ()=>{ _changeMode = "edit";  if (m) closeModal(m); if (_changeContext) { editingItem = _changeContext.itemEl || null; openForm(_changeContext.itemEl.closest('.column')?.dataset.column||"India", _changeContext.payload); } };
+  if (btnE) btnE.onclick = ()=>{ _changeMode = "edit";  changeTypeSendRequired = false; if (m) closeModal(m); if (_changeContext) { editingItem = _changeContext.itemEl || null; openForm(_changeContext.itemEl.closest('.column')?.dataset.column||"India", _changeContext.payload); } };
 
-  if (btnC) btnC.onclick = ()=>{ _changeMode = "correct"; if (m) closeModal(m); if (_changeContext) { editingItem = _changeContext.itemEl || null; openForm(_changeContext.itemEl.closest('.column')?.dataset.column||"India", _changeContext.payload); } };
+  if (btnC) btnC.onclick = ()=>{ _changeMode = "correct"; changeTypeSendRequired = false; if (m) closeModal(m); if (_changeContext) { editingItem = _changeContext.itemEl || null; openForm(_changeContext.itemEl.closest('.column')?.dataset.column||"India", _changeContext.payload); } };
 
-  if (btnU) btnU.onclick = ()=>{ _changeMode = "update"; if (m) closeModal(m); if (_changeContext) { editingItem = _changeContext.itemEl || null; openForm(_changeContext.itemEl.closest('.column')?.dataset.column||"India", _changeContext.payload); } };
+  if (btnU) btnU.onclick = ()=>{ _changeMode = "update"; changeTypeSendRequired = false; if (m) closeModal(m); if (_changeContext) { editingItem = _changeContext.itemEl || null; openForm(_changeContext.itemEl.closest('.column')?.dataset.column||"India", _changeContext.payload); } };
 
-  if (btnX) btnX.onclick = ()=>{ _changeMode = null; _changeContext = null; if (m) closeModal(m); };
+  if (btnX) btnX.onclick = ()=>{ _changeMode = null; _changeContext = null; changeTypeSendRequired = false; if (m) closeModal(m); };
 
 })();
 
@@ -4645,7 +4655,7 @@ function logChangeHistory(kind /* "correct"|"update"|"edit" */, code, by, tacrep
 
     const isClosed = entry.getAttribute("aria-hidden") === "true" || entry.style.display === "none";
 
-    if (isClosed && (_changeMode === "correct" || _changeMode === "update") && _changeContext) {
+    if (isClosed && changeTypeSendRequired && (_changeMode === "correct" || _changeMode === "update") && _changeContext) {
 
       try{
 
@@ -4679,8 +4689,12 @@ function logChangeHistory(kind /* "correct"|"update"|"edit" */, code, by, tacrep
 
         _changeContext = null;
 
+        changeTypeSendRequired = false;
+
       }
 
+    } else if (isClosed) {
+      changeTypeSendRequired = false;
     }
 
   });
@@ -7625,6 +7639,9 @@ state.changeHistory = changeHistory;
 
   if(!Number.isInteger(blockStartNum) || !crewPosition){ alert("Set up mission first."); return; }
 
+  changeTypeSendRequired = false;
+  const requiresSendFlow = (_changeMode === "correct" || _changeMode === "update");
+
 
 
   const columnName=$("#targetColumn").value;
@@ -7915,7 +7932,9 @@ state.changeHistory = changeHistory;
 
 
 
-    closeForm();
+    changeTypeSendRequired = requiresSendFlow;
+
+    closeForm({ preserveChangeMode: requiresSendFlow });
 
     dirty=true; requestAutoSyncSave();
 
@@ -8514,7 +8533,7 @@ function findDeletedElementByCode(code){
 
     const actions=document.createElement("div"); actions.className="item-actions";
 
-    const historyBtn=document.createElement("button"); historyBtn.type="button"; historyBtn.className="icon-btn icon-history"; historyBtn.innerHTML="??"; historyBtn.title="View History";
+    const historyBtn=document.createElement("button"); historyBtn.type="button"; historyBtn.className="icon-btn icon-history"; historyBtn.innerHTML = "<span aria-hidden=\"true\">\u23F2\uFE0E</span>"; historyBtn.setAttribute("aria-label","View History"); historyBtn.title="View History";
 
     const editBtn=document.createElement("button"); editBtn.type="button"; editBtn.className="icon-btn icon-edit"; editBtn.innerHTML=ICON_PENCIL; editBtn.title="Edit";
 
@@ -11496,6 +11515,9 @@ function renderCreatorAndAbbrev(payload){
 
 
 })();
+
+
+
 
 
 
