@@ -1996,22 +1996,8 @@ const timelineItems = (function(){
 
 
 timelineItems.forEach(p=>{
-
-  const lat = (p.latDeg && p.latMin)
-
-    ? `${p.latDeg}ÃÂ° ${p.latMin}' ${(p.latSec ? String(p.latSec).padStart(2,"0") : "00")}${p.latDecSecStr ? '.' + p.latDecSecStr : ''}" ${p.latHem || ''}`
-
-    : "";
-
-
-
-  const lon = (p.lonDeg && p.lonMin)
-
-    ? `${p.lonDeg}ÃÂ° ${p.lonMin}' ${(p.lonSec ? String(p.lonSec).padStart(2,"0") : "00")}${p.lonDecSecStr ? '.' + p.lonDecSecStr : ''}" ${p.lonHem || ''}`
-
-    : "";
-
-
+  const lat = formatDmsString(p.latDeg, p.latMin, p.latSec, p.latDecSecStr, p.latHem) || "";
+  const lon = formatDmsString(p.lonDeg, p.lonMin, p.lonSec, p.lonDecSecStr, p.lonHem) || "";
 
   timelineRows.push([
 
@@ -9213,7 +9199,7 @@ function createTimelineItem(p){
 
   editBtn.className = "icon-btn icon-edit";
 
-  editBtn.innerHTML = "??";
+  editBtn.innerHTML = ICON_PENCIL;
 
   editBtn.title = "Edit";
 
@@ -9225,7 +9211,7 @@ function createTimelineItem(p){
 
   delBtn.className = "icon-btn icon-delete";
 
-  delBtn.innerHTML = "?";
+  delBtn.innerHTML = ICON_X;
 
   delBtn.title = "Delete";
 
@@ -9923,7 +9909,7 @@ function updateCorrelationMeta(card){
 
   const d=new Date(Number(card.dataset.lastAt||0));
 
-  const meta=`${card.dataset.lastBy || card.dataset.createdBy || "--"} Ã¢â¬Â¢ ${fmtDateNoYearUTC(d)} ${fmtTimeUTC(d)}`;
+  const meta=`${card.dataset.lastBy || card.dataset.createdBy || "--"} • ${fmtDateNoYearUTC(d)} ${fmtTimeUTC(d)}`;
 
   const creator=card.querySelector(".creator");
 
@@ -10089,7 +10075,7 @@ function createCorrelationCard(entry){
 
   const actions=document.createElement("div"); actions.className="item-actions";
 
-  const delBtn=document.createElement("button"); delBtn.type="button"; delBtn.className="icon-btn icon-delete"; delBtn.innerHTML="?"; delBtn.title="Delete correlation";
+  const delBtn=document.createElement("button"); delBtn.type="button"; delBtn.className="icon-btn icon-delete"; delBtn.innerHTML=ICON_X; delBtn.title="Delete correlation";
 
   delBtn.addEventListener("click", ()=>{ openConfirm("Delete this correlation?", ()=>{ card.remove(); dirty=true; requestAutoSyncSave(); }); });
 
@@ -11515,6 +11501,8 @@ function renderCreatorAndAbbrev(payload){
 
 
 })();
+
+
 
 
 
