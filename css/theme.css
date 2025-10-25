@@ -28,3 +28,9 @@ button[disabled] { opacity: .6; cursor: not-allowed; }
 }
 
 .muted { color:#666; font-size:12px; }
+
+#repinTracker {
+  font-size:30px; /* still larger than base muted text but slightly reduced */
+  font-weight:600;
+  line-height:1.2;
+}

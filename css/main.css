@@ -2,11 +2,9 @@
 #md_meta_wrap { 
   display: contents;            /* let its children become grid items of .cd-grid */
 }
-
 #md_meta_wrap .row.tight { 
   display: contents;            /* dissolve the row wrappers into the grid as well */
 }
-
 /* Labels sit in the Shift column (grid column 1) */
 #md_meta_wrap label[for="md_callsign"],
 #md_meta_wrap label[for="md_missionNumber"],
@@ -16,7 +14,6 @@
   white-space: nowrap;
   align-self: center;
 }
-
 /* Inputs sit in the Turnover column (grid column 2) and anchor text to the same inset as headers */
 #md_meta_wrap input#md_callsign,
 #md_meta_wrap input#md_missionNumber,
@@ -31,14 +28,15 @@
   text-align: left;
   direction: ltr;
 }
-
   /* Landing */
   #landing { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height: 100vh; gap:14px; }
   #landing h1 { padding:0; }
   .landing-warning { color:#c62828; }
   .landing-buttons { display:flex; gap:10px; }
   .contact-message { line-height:1.6; text-align:center; white-space:pre-line; }
-
+  #entryModal .ais-only { display:none !important; }
+  #entryModal[data-tacrep="AIS"] .ais-only { display:block !important; }
+  #entryModal[data-tacrep="Echo"] .hide-for-echo { display:none !important; }
   /* App shell */
   #app { display:none; padding: 0 20px 20px; }
   .topbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#fff; border:1px solid #ddd; border-radius:8px; padding:10px; margin: 0 20px 16px; }
@@ -47,30 +45,24 @@
   .topbar .icon-btn:hover { background:#4338ca; }
   .pill { background:#eef3ff; border:1px solid #c9d8ff; border-radius:999px; padding:6px 10px; }
   .pill strong { margin-right:6px; }
-
   /* Center time bar */
   .timebar { display:flex; justify-content:center; gap:14px; align-items:center; margin: 6px 20px 0; font-size:14px; color:#222; }
   .timebar .sep { opacity:.5; }
-
   /* Board grid */
   .board { margin: 0 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .column { background:#fff; border:1px solid #ccc; border-radius:8px; padding:10px; display:flex; flex-direction:column; min-height: 240px; }
   .column h2 { margin:0 0 10px; font-size:18px; text-align:center; }
- 
   .items { flex:1; }
   .add-btn { margin-top:10px; }
-
   /* TACREP / Correlation cards */
   .item { background:#eef3ff; border-radius:8px; padding:8px; margin-bottom:8px; transition: box-shadow .15s, outline-color .15s, outline-style .15s; outline: none; }
   .item.flash { background:#ffeb3b !important; transition: background .15s; }
   .item.corr-highlighted { background:#ffeb3b !important; }
   .item.highlight-mine   { outline:2px solid var(--mine);   box-shadow:0 0 0 2px rgba(46,125,50,.08); }
   .item.highlight-others { outline:2px solid var(--others); box-shadow:0 0 0 2px rgba(31,58,147,.08); }
-
   /* Select mode outlines */
   .select-mode .item.selectable { outline:2px dotted #0c7c59; }
   .select-mode .item.selectable.selected { outline-style: solid; }
-
   .item-header { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
   .badge-wrap { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
   .pm { display:inline-block; width:18px; text-align:center; font-weight:bold; color:#333; cursor:pointer; user-select:none; }
@@ -94,7 +86,6 @@ user-select: text;
   .icon-restore { background: var(--ok); } .icon-restore:hover { background: var(--okH); }
   .icon-history { background: #2196F3; } .icon-history:hover { background: #1976D2; }
   .icon-history:disabled { background: #9e9e9e; cursor: not-allowed; opacity: 0.6; }
-
   /* TACREP History Modal */
   .tacrep-history-container { max-height:500px; overflow-y:auto; display:flex; flex-direction:column; gap:16px; }
   .history-version { background:#f8f9fa; border:1px solid #dee2e6; border-radius:8px; padding:12px; }
@@ -106,7 +97,6 @@ user-select: text;
   .history-field-value { color:#212529; }
   .history-field-changed { background:#fff3cd; padding:2px 4px; border-radius:3px; border:1px solid #ffc107; }
   .history-separator { text-align:center; color:#6c757d; font-size:12px; margin:8px 0; }
-
   .item-details { display:none; flex-wrap:wrap; gap:8px 16px; line-height:1.3; margin-top:6px; align-items:center; }
   .item.expanded .item-details { display:flex; }
   /* Crew Details tile should always show its details */
@@ -127,18 +117,14 @@ padding: 0;
 .item.expanded .collapsed-only { display:none; }
   .detail em { font-style:normal; color:#333; }
   .detail-line { display:block; font-family: "Consolas", "SFMono-Regular", "Menlo", monospace; white-space: pre-wrap; color:#111; }
-
   /* Copy inline pill */
   .copy-pill { flex:0 0 auto; background:#f0f7ff; color:#0b3d91; border:1px solid #c9e1ff; border-radius:999px; padding:3px 8px; font-size:12px; cursor:pointer; }
   .copy-pill:hover { background:#e2f0ff; }
   .copy-pill.copied { background:#e4ffe9; border-color:#b7f5c2; color:#1b5e20; }
-
   .dot { flex:0 0 auto; padding:0 2px; align-self:center; font-weight:bold; }
   .dot[aria-hidden="true"] { opacity:.7; }
-
   /* Info banner */
   .banner { display:none; margin: 0 20px 10px; background:#fff3cd; border:1px solid #ffe08a; color:#664d03; padding:10px; border-radius:8px; }
-
   /* Modals */
   .modal { display:none; position:fixed; z-index:1000; inset:0; background:rgba(0,0,0,.5); justify-content:center; align-items:center; }
 .modal .content {
@@ -152,7 +138,6 @@ padding: 0;
   box-shadow:0 10px 30px rgba(0,0,0,.2);
   overflow-x:auto;          /* allow horizontal scroll if window is narrow */
 }
-
   .modal h3 { margin:0 0 10px; }
   .modal label { display:block; margin:8px 0 4px; }
   .settings-body { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
@@ -175,12 +160,10 @@ padding: 0;
   input[type="text"], input[type="number"], select, textarea { width:100%; padding:8px; box-sizing:border-box; border:1px solid #ccc; border-radius:6px; }
   textarea { min-height: 90px; }
   input[disabled]{ background:#f1f1f1; }
-
   /* Export window table */
   .tbl { width:100%; border-collapse: collapse; background:#fff; }
   .tbl th, .tbl td { border:1px solid #e5e7eb; padding:6px 8px; font-size:13px; text-align:left; }
   .tbl th { background:#f7faff; }
-
   /* Suggestion Box styles (errors) */
   .sb-field.error input,
   .sb-field.error textarea { border-color: var(--err); box-shadow: inset 0 0 0 1px var(--err); background: #fff; }
@@ -228,7 +211,6 @@ padding: 0;
 .avp-tile:active { transform: translateY(0); }
 .avp-tile[disabled] { opacity:.6; cursor:not-allowed; }
 .avp-tile span { display:block; }
-
   /* Crew Details grid */
 .cd-grid{
   display:grid;
@@ -237,7 +219,6 @@ grid-template-columns: 90px repeat(7, minmax(120px, 1fr));
   grid-auto-flow: row;       /* force row-wise placement */
   gap: 8px 12px;
   align-items: center;
-
   /* Make the crew table look like the screenshot */
   background:#e7eefc;
   padding:10px;
@@ -245,18 +226,15 @@ grid-template-columns: 90px repeat(7, minmax(120px, 1fr));
 }
 /* === Crew Details cell alignment (headers ↔ inputs) === */
 .cd-grid { --cell-pad: 8px; }                 /* the exact inset you want */
-
 .cd-head .hdr{
   font-weight:700;
   color:#123;
   padding-left: var(--cell-pad);              /* header text inset */
 }
-
 /* first column ("Shift") keeps its smaller inset to match your body rows */
 .cd-head .hdr:first-child{
   padding-left: 6px;
 }
-
 /* kill the browser's default left padding in inputs and replace it with the same inset */
 .cd-grid input[type="text"],
 .cd-grid select,
@@ -265,7 +243,6 @@ grid-template-columns: 90px repeat(7, minmax(120px, 1fr));
   text-indent: var(--cell-pad);               /* match header inset exactly */
   box-sizing: border-box;                     /* keep widths predictable */
 }
-
 /* body-row "Shift" label already uses 6px — keep that as-is */
 #crewDetailsTile .cd-row > div:first-child{
   padding-left: 6px;
@@ -278,7 +255,6 @@ grid-template-columns: 90px repeat(7, minmax(120px, 1fr));
   color:#123;
   padding-left:8px;       /* NEW: matches input[type="text"] default padding */
 }
-
 /* First column (“Shift”) uses the same small inset as your body rows */
 .cd-head .hdr:first-child{
   padding-left:6px;       /* matches: #crewDetailsTile .cd-row > div:first-child { padding-left:6px; } */
@@ -292,3 +268,8 @@ grid-template-columns: 90px repeat(7, minmax(120px, 1fr));
   margin-left: 4px;
 }
 
+#echoPositionDynamic{margin-top:8px;}
+#echoPositionDynamic .echo-pos-block{margin-bottom:12px;}
+#echoPositionDynamic:not(.active){display:none;}
+#echoPositionDynamic .echo-pos-block{display:none;}
+#echoPositionDynamic .echo-pos-block.echo-pos-active{display:block;}

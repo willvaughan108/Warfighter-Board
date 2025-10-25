@@ -360,24 +360,32 @@
         <input type="checkbox" class="abbrChk" data-field="time" title="Include in abbreviation">
       </div>
 
+      <label for="systemOrPlatform" class="system-field" style="display:none;">System / Platform</label>
+      <div class="row tight inline-check system-field" style="display:none;">
+        <input type="text" id="systemOrPlatform" placeholder="e.g., P-8A Poseidon">
+        <input type="checkbox" class="abbrChk" data-field="systemOrPlatform" title="Include in abbreviation">
+      </div>
+
+      <label for="echoEmitter" class="echo-only" style="display:none;">Emitter Name</label>
+      <div class="row tight inline-check echo-only" style="display:none;">
+        <input type="text" id="echoEmitter" placeholder="e.g., RSN-123">
+        <input type="checkbox" class="abbrChk" data-field="emitterName" title="Include in abbreviation">
+      </div>
+
+      <label for="echoActivity" class="echo-only" style="display:none;">Activity or Function</label>
+      <div class="row tight inline-check echo-only" style="display:none;">
+        <input type="text" id="echoActivity" placeholder="e.g., coastal search">
+        <input type="checkbox" class="abbrChk" data-field="activityOrFunction" title="Include in abbreviation">
+      </div>
+
+      <label for="echoFreq" class="echo-only" style="display:none;">Frequency</label>
+      <div class="row tight inline-check echo-only" style="display:none;">
+        <input type="text" id="echoFreq" placeholder="e.g., 9.375" inputmode="decimal" pattern="[0-9]+\.?[0-9]*">
+        <select id="echoFreqUnit"><option>MHz</option><option>GHz</option></select>
+        <input type="checkbox" class="abbrChk" data-field="frequency" title="Include in abbreviation">
+      </div>
+
       <label for="vesselType">Vessel Type</label>
-      <!-- Echo-only fields: System/Platform, Emitter, Activity/Function, Frequency -->
-
-<label for="echoSystem" class="echo-only" style="display:none;">System or Platform</label>
-
-<div class="row tight inline-check echo-only" style="display:none;"> <input type="text" id="echoSystem" placeholder="e.g., ELINT Drone"> <input type="checkbox" class="abbrChk" data-field="systemOrPlatform" title="Include in abbreviation"> </div>
-
-<label for="echoEmitter" class="echo-only" style="display:none;">Emitter Name</label>
-
-<div class="row tight inline-check echo-only" style="display:none;"> <input type="text" id="echoEmitter" placeholder="e.g., RSN-123"> <input type="checkbox" class="abbrChk" data-field="emitterName" title="Include in abbreviation"> </div>
-
-<label for="echoActivity" class="echo-only" style="display:none;">Activity or Function</label>
-
-<div class="row tight inline-check echo-only" style="display:none;"> <input type="text" id="echoActivity" placeholder="e.g., coastal search"> <input type="checkbox" class="abbrChk" data-field="activityOrFunction" title="Include in abbreviation"> </div>
-
-<label for="echoFreq" class="echo-only" style="display:none;">Frequency</label>
-
-<div class="row tight inline-check echo-only" style="display:none;"> <input type="text" id="echoFreq" placeholder="e.g., 9.375" inputmode="decimal" pattern="[0-9]+\.?[0-9]*"> <select id="echoFreqUnit"><option>MHz</option><option>GHz</option></select> <input type="checkbox" class="abbrChk" data-field="frequency" title="Include in abbreviation"> </div>
       <div class="row tight inline-check">
         <input type="text" id="vesselType" placeholder="Poss Combatant">
         <input type="checkbox" class="abbrChk" data-field="vesselType" title="Include in abbreviation">
@@ -413,7 +421,30 @@
         <input type="checkbox" class="abbrChk" data-field="sensor" title="Include in abbreviation">
       </div>
 
-<label>Latitude (D° M' S.SS")</label>
+      <label for="tq" class="india-only" style="display:none;">TQ</label>
+      <div class="row tight inline-check india-only" style="display:none;">
+        <input type="text" id="tq" placeholder="e.g., TQ data">
+        <input type="checkbox" class="abbrChk" data-field="tq" title="Include in abbreviation">
+      </div>
+
+      <label for="echoPositionMode" class="echo-only" style="display:none;">Position Data</label>
+      <div class="row tight inline-check echo-only" style="display:none;">
+        <select id="echoPositionMode">
+          <option value="latlon" selected>Latitude / Longitude</option>
+          <option value="aou">Area of Uncertainty (AOU)</option>
+          <option value="bearing">Bearing</option>
+          <option value="ivo" hidden>IVO</option>
+        </select>
+      </div>
+      <div id="echoPositionDynamic" class="echo-only" style="display:none;"></div>
+
+      <label for="ivoDescription" class="echo-only" style="display:none;">Description</label>
+      <div class="row tight echo-only" style="display:none;">
+        <textarea id="ivoDescription" rows="2" placeholder="Describe IVO details..."></textarea>
+        <input type="checkbox" class="abbrChk" data-field="ivo" title="Include in abbreviation">
+      </div>
+
+<label>Latitude (D&deg; M' S.SS")</label>
 <div class="row tight">
   <input type="text" id="latDeg" placeholder="Deg" inputmode="numeric" maxlength="2">
   <input type="text" id="latMin" placeholder="Min" inputmode="numeric" maxlength="2">
@@ -424,7 +455,7 @@
 </div>
 
 
-  <label>Longitude (D° M' S.SS")</label>
+  <label>Longitude (D&deg; M' S.SS")</label>
 <div class="row tight inline-check">
   <input type="text" id="lonDeg" placeholder="Deg" inputmode="numeric" maxlength="3">
   <input type="text" id="lonMin" placeholder="Min" inputmode="numeric" maxlength="2">
@@ -436,21 +467,80 @@
 </div>
 
 
-    <label for="course">Course</label>
+     
+      <label for="majorAxis" class="shape-echo" style="display:none;">Major Axis</label>
+      <div class="row tight inline-check shape-echo" style="display:none;">
+        <input type="text" id="majorAxis" placeholder="e.g., 500">
+        <input type="checkbox" class="abbrChk" data-field="majorAxis" title="Include in abbreviation">
+      </div>
+
+      <label for="minorAxis" class="shape-echo" style="display:none;">Minor Axis</label>
+      <div class="row tight inline-check shape-echo" style="display:none;">
+        <input type="text" id="minorAxis" placeholder="e.g., 200">
+        <input type="checkbox" class="abbrChk" data-field="minorAxis" title="Include in abbreviation">
+      </div>
+
+      <label for="orientation" class="shape-echo" style="display:none;">Orientation</label>
+      <div class="row tight inline-check shape-echo" style="display:none;">
+        <input type="text" id="orientation" placeholder="e.g., 045">
+        <input type="checkbox" class="abbrChk" data-field="orientation" title="Include in abbreviation">
+      </div>
+
+      
+
+      <label for="bearing" class="shape-only" style="display:none;">Bearing</label>
+      <div class="row tight inline-check shape-only" style="display:none;">
+        <input type="text" id="bearing" placeholder="e.g., 045">
+        <input type="checkbox" class="abbrChk" data-field="bearing" title="Include in abbreviation">
+      </div>
+
+      <div id="ownshipLatLonGroup" style="display:none;">
+        <label>Ownship Latitude (D&deg; M' S.SS")</label>
+        <div class="row tight">
+          <input type="text" id="ownLatDeg" placeholder="Deg" inputmode="numeric" maxlength="2">
+          <input type="text" id="ownLatMin" placeholder="Min" inputmode="numeric" maxlength="2">
+          <input type="text" id="ownLatSec" placeholder="Sec" inputmode="numeric" maxlength="2">
+          <span class="dot" aria-hidden="true">.</span>
+          <input type="text" id="ownLatDecSec" placeholder="Dec Sec" inputmode="numeric" maxlength="2">
+          <select id="ownLatHem"><option value="N">N</option><option value="S">S</option></select>
+        </div>
+
+        <label>Ownship Longitude (D&deg; M' S.SS")</label>
+        <div class="row tight inline-check">
+          <input type="text" id="ownLonDeg" placeholder="Deg" inputmode="numeric" maxlength="3">
+          <input type="text" id="ownLonMin" placeholder="Min" inputmode="numeric" maxlength="2">
+          <input type="text" id="ownLonSec" placeholder="Sec" inputmode="numeric" maxlength="2">
+          <span class="dot" aria-hidden="true">.</span>
+          <input type="text" id="ownLonDecSec" placeholder="Dec Sec" inputmode="numeric" maxlength="2">
+          <select id="ownLonHem"><option value="E">E</option><option value="W">W</option></select>
+        </div>
+      </div>
+
+      <label for="ownshipPosit" class="shape-only" style="display:none;">Ownship Posit</label>
+      <div class="row tight inline-check shape-only" style="display:none;">
+        <input type="text" id="ownshipPosit" placeholder="Ownship position">
+        <input type="checkbox" class="abbrChk" data-field="ownshipPosit" title="Include in abbreviation">
+      </div>
+
+      <label for="amplification" class="shape-only" style="display:none;">Amplification</label>
+      <div class="row tight shape-only" style="display:none;">
+        <textarea id="amplification" rows="2" placeholder="Amplification details"></textarea>
+        <input type="checkbox" class="abbrChk" data-field="amplification" title="Include in abbreviation">
+      </div>
+
+      <label for="course">Course</label>
       <div class="row tight inline-check">
         <input type="text" id="course" inputmode="numeric" placeholder="e.g., 270" pattern="[0-9]{1,3}" maxlength="3">
         <input type="checkbox" class="abbrChk" data-field="course" title="Include in abbreviation">
       </div>
 
-           <label for="speed">Speed</label>
-
+      <label for="speed">Speed</label>
       <div class="row tight inline-check">
         <input type="text" id="speed" placeholder="e.g., 12.5" inputmode="decimal" pattern="[0-9]+\.?[0-9]*">
         <input type="checkbox" class="abbrChk" data-field="speed" title="Include in abbreviation">
       </div>
 
-          <label for="trackNumber">Track Number</label>
-
+      <label for="trackNumber">Track Number</label>
       <div class="row tight inline-check">
         <input type="text" id="trackNumber" placeholder="e.g., T001">
         <input type="checkbox" class="abbrChk" data-field="trackNumber" title="Include in abbreviation">
@@ -467,7 +557,6 @@
         <textarea id="additionalInfo" placeholder="Additional information..." rows="3"></textarea>
         <input type="checkbox" class="abbrChk" data-field="additionalInfo" title="Include in abbreviation">
       </div>
-
       <label for="minotaurPaste">Minotaur Paste</label>
       <div class="row tight">
         <textarea id="minotaurPaste" placeholder="Paste Minotaur data..." rows="3"></textarea>
