@@ -5,7 +5,7 @@
 
   window.AppConfig = {
     SETTINGS: parsedSettings,
-    APP_VERSION: parsedSettings.version || 'v0.90',
+    APP_VERSION: parsedSettings.version || 'v1.0',
     EMAIL_DOMAIN: parsedSettings.emailDomain || 'us.navy.mil',
     AUTO_SAVE_MS: Number(parsedSettings.autoSaveMs || 400),
     POLL_MS: Number(parsedSettings.pollMs || 5000),

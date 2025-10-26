@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="UTF-8">
-<title>Warfighter Board</title>
+<title>TacDesk</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <!-- REGION:settings-json START -->
 <script id="settings-json" type="application/json">
 {
-  "version": "v0.90",
+  "version": "v1.0",
   "emailDomain": "us.navy.mil",
   "abbrevDefaults": ["time","vesselType","sensor"],
   "abbrevMax": 3,
@@ -30,7 +30,7 @@
 
 <section id="landing">
   <h1 class="landing-warning">NOT APPROVED FOR USE</h1>
-  <h1>Warfighter Board <span class="ver" id="versionA">v0.90</span></h1>
+  <h1 class="brand-title">TacDesk <span class="ver" id="versionA">v1.0</span></h1>
   <div class="landing-buttons">
     <button id="btnLandingNew" type="button">New Mission</button>
     <button id="btnLandingCollab" type="button" class="btn-secondary">Collaborate</button>
@@ -42,7 +42,7 @@
 <!-- REGION:app START -->
 <section id="app" aria-hidden="true">
   <h1 class="landing-warning">NOT APPROVED FOR USE</h1>
-  <h1>Warfighter Board <span class="ver" id="versionB">v0.90</span></h1>
+  <h1>TacDesk <span class="ver" id="versionB">v1.0</span></h1>
 
   <div class="timebar" aria-live="polite">
     <span id="dateLocal">Sep 23</span><span class="sep">|</span>
@@ -293,6 +293,7 @@
       <th>Time</th>
       <th>Type</th>
       <th>Airfield</th>
+      <th>Fault</th>
       <th>Lat</th>
       <th>Lon</th>
       <th>Altitude</th>
@@ -491,7 +492,7 @@
 
       <label for="bearing" class="shape-only" style="display:none;">Bearing</label>
       <div class="row tight inline-check shape-only" style="display:none;">
-        <input type="text" id="bearing" placeholder="e.g., 045">
+        <input type="text" id="bearing" placeholder="e.g., 045" inputmode="numeric" pattern="[0-9]{1,3}" maxlength="3">
         <input type="checkbox" class="abbrChk" data-field="bearing" title="Include in abbreviation">
       </div>
 
@@ -594,7 +595,7 @@
         For questions or suggestions:<br>
         LT William Vaughan<br>
         VP30<br>
-        William.E.Vaughn45.mil@us.navy.mil
+        William.E.Vaughan45.mil@us.navy.mil
       </div>
       <div class="actions" style="margin-top:12px;">
         <button type="button" id="sb-cancel" class="btn-secondary">Close</button>

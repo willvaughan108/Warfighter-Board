@@ -10,7 +10,7 @@
 
     SETTINGS = {},
 
-    APP_VERSION = "v0.90",
+    APP_VERSION = "v1.0",
 
     EMAIL_DOMAIN = "us.navy.mil",
 
@@ -122,6 +122,18 @@
 
   // ---- TACREP numbering helpers ----
 
+const usedNumberCache = new Map();
+let usedNumberCachePendingClear = false;
+
+function scheduleUsedNumberCacheClear(){
+  if (usedNumberCachePendingClear) return;
+  usedNumberCachePendingClear = true;
+  queueMicrotask(()=>{
+    usedNumberCachePendingClear = false;
+    usedNumberCache.clear();
+  });
+}
+
 function getPrefixFromColumnName(columnName){
 
   const col = document.querySelector(`.column[data-column="${CSS.escape(columnName)}"]`);
@@ -139,6 +151,8 @@ function getPrefixFromCode(code){
 }
 
 function collectUsedNumbers(prefix){
+
+  if (usedNumberCache.has(prefix)) return usedNumberCache.get(prefix);
 
   // ACTIVE columns only (exclude Deleted/History/Correlations)
 
@@ -166,6 +180,8 @@ function collectUsedNumbers(prefix){
 
   }
 
+  usedNumberCache.set(prefix, used);
+  scheduleUsedNumberCacheClear();
   return used;
 
 }
@@ -186,16 +202,18 @@ function lowestAvailable(prefix, columnName){
 
 }
 
-function nextHighest(prefix){
-
+function nextHighest(prefix, columnName){
   const used = collectUsedNumbers(prefix);
-
   let max = 0;
-
   for(const v of used) if(v > max) max = v;
-
-  return max + 1;
-
+  const blockStartBase = Number.isInteger(blockStartNum) && blockStartNum > 0 ? blockStartNum : 1;
+  const columnBase = (columnName && Number.isInteger(columnNextNumber[columnName])) ? columnNextNumber[columnName] : null;
+  const base = columnBase && columnBase > 0 ? columnBase : blockStartBase;
+  if(!used.size){
+    return base;
+  }
+  const candidate = Math.max(max + 1, base);
+  return candidate;
 }
 
 
@@ -220,6 +238,27 @@ function nextHighest(prefix){
 
 
   const columnNextNumber = { India:null, Echo:null, AIS:null, Alpha:null, November:null, Golf:null, Other:null };
+  function getColumnMaxNumber(columnName){
+    if(!columnName) return null;
+    const column = document.querySelector(`.column[data-column="${CSS.escape(columnName)}"] .items`);
+    if(!column) return null;
+    let max = null;
+    column.querySelectorAll(".item .badge").forEach(b=>{
+      const code = b.textContent.trim();
+      const m = code.startsWith("AIS") ? code.match(/^AIS(\d+)$/) : code.match(/^[A-Za-z]+(\d+)$/);
+      if(m && m[1]){
+        const num = Number(m[1]);
+        if(Number.isFinite(num)) max = (max===null) ? num : Math.max(max, num);
+      }
+    });
+    return max;
+  }
+  function syncColumnNextNumber(columnName){
+    if(!columnName || !(columnName in columnNextNumber)) return;
+    const max = getColumnMaxNumber(columnName);
+    const base = Number.isInteger(blockStartNum) && blockStartNum > 0 ? blockStartNum : 1;
+    columnNextNumber[columnName] = (max===null) ? base : (max + 1);
+  }
 
   let deletedSetLocal = new Set();
 
@@ -350,6 +389,7 @@ const TACREP_TYPES = ["India","Echo","AIS","Alpha","November","Golf","Other"];
 const ICON_RESTORE = '<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5"/></svg>'
 const POSITION_MODE_TYPES = new Set(["Echo","Alpha","November","Golf"]);
 const IVO_POSITION_TYPES = new Set(["Alpha","November","Golf"]);
+const BEARING_LIMIT_TYPES = new Set(["Alpha","November","Golf"]);
 const HISTORY_FIELD_MAP = {
   India: [
     { key: "timeHHMM", label: "Time" },
@@ -1403,6 +1443,26 @@ if(entryForm){
 }
 applyEntrySaveState();
 
+function validateBearingFieldForType(type){
+  if(!BEARING_LIMIT_TYPES.has(type)) return true;
+  const field = document.getElementById("bearing");
+  if(!field) return true;
+  const raw = field.value.trim();
+  if(!raw) return true;
+  if(!/^\d{1,3}$/.test(raw)){
+    alert("Bearing must be a number between 0 and 359.");
+    field.focus();
+    return false;
+  }
+  const num = Number(raw);
+  if(!Number.isFinite(num) || num < 0 || num > 359){
+    alert("Bearing must be a number between 0 and 359.");
+    field.focus();
+    return false;
+  }
+  return true;
+}
+
 // --- OVERWRITE-ON-EDIT PATCH (prevents "Edit TACREP" from creating a new one) ---
 
 (function installEditOverwriteBehavior(){
@@ -1726,6 +1786,10 @@ if(!entryFormDirty){
 
 const requiresSendFlow = (_changeMode === "correct" || _changeMode === "update");
 
+const editType = (document.getElementById("targetColumn")?.value || "Other");
+if(!validateBearingFieldForType(editType)){
+  return;
+}
 
 
 // We are editing: prevent any other submit handlers from running
@@ -1952,9 +2016,19 @@ try {
 
   const fmtTimeUTC = d => isValidDate(d) ? `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}Z` : "--";
 
-  const fmtTZ = (d, tz) => isValidDate(d) ? new Intl.DateTimeFormat(undefined, {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:tz}).format(d) : "--";
+  const tzFormatterCache = new Map();
+  const getTZFormatter = (tz)=>{
+    if(!tzFormatterCache.has(tz)){
+      tzFormatterCache.set(tz, new Intl.DateTimeFormat(undefined, {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:tz}));
+    }
+    return tzFormatterCache.get(tz);
+  };
 
-  const fmtDateNoYearUTC = d => isValidDate(d) ? new Intl.DateTimeFormat(undefined, {month:'short',day:'2-digit',timeZone:'UTC'}).format(d) : "--";
+  const dateNoYearFormatter = new Intl.DateTimeFormat(undefined, {month:'short',day:'2-digit',timeZone:'UTC'});
+
+  const fmtTZ = (d, tz) => isValidDate(d) ? getTZFormatter(tz).format(d) : "--";
+
+  const fmtDateNoYearUTC = d => isValidDate(d) ? dateNoYearFormatter.format(d) : "--";
 
   function tickClocks(){
 
@@ -2091,23 +2165,15 @@ timelineItems.forEach(p=>{
   const lon = formatDmsString(p.lonDeg, p.lonMin, p.lonSec, p.lonDecSecStr, p.lonHem) || "";
 
   timelineRows.push([
-
     p.timeHHMM||"",
-
     p.type||"",
-
-    (p.type === "REPIN" ? (p.associatedFault || "") : (p.airfield||"")),
-
+    p.airfield||"",
+    (p.type === "REPIN" ? (p.associatedFault || "") : (p.fault || "")),
     lat,
-
     lon,
-
     p.altitude||"",
-
     p.createdBy||"",
-
     p.createdAt ? new Date(p.createdAt).toISOString() : ""
-
   ]);
 
 });
@@ -3666,7 +3732,14 @@ renderTacrepDetailsInto = function(item, payload) {
 
   let p = payload;
 
-  if (!p) { try { p = JSON.parse(item.dataset.payload || "{}"); } catch { p = {}; } }
+  if (!p) {
+    const raw = item.dataset.payload || "{}";
+    if (item._cachedPayloadRaw !== raw) {
+      item._cachedPayloadRaw = raw;
+      try { item._cachedPayloadParsed = JSON.parse(raw); } catch { item._cachedPayloadParsed = {}; }
+    }
+    p = item._cachedPayloadParsed || {};
+  }
 
 
 
@@ -3724,9 +3797,9 @@ renderTacrepDetailsInto = function(item, payload) {
     const copyBtn = document.createElement("button");
     copyBtn.type = "button";
     copyBtn.className = "copy-pill copy-slash-btn";
-    copyBtn.dataset.originalLabel = "Copy slash";
-    copyBtn.textContent = "Copy slash";
-    copyBtn.setAttribute("aria-label", "Copy slash-formatted TACREP");
+    copyBtn.dataset.originalLabel = "Copy Report";
+    copyBtn.textContent = "Copy Report";
+    copyBtn.setAttribute("aria-label", "Copy report to clipboard");
     copyBtn.addEventListener("click", ()=> copySlashLineToClipboard(slashLine, copyBtn));
 
     slashWrap.appendChild(span);
@@ -3774,7 +3847,12 @@ renderTacrepDetailsInto = function(item, payload) {
 
     if (!item.classList.contains("expanded")) return;      // only render when expanded
 
-    renderTacrepDetailsInto(item);
+    if (item._renderQueued) return;
+    item._renderQueued = true;
+    requestAnimationFrame(()=>{
+      item._renderQueued = false;
+      renderTacrepDetailsInto(item);
+    });
 
   };
 
@@ -3788,7 +3866,9 @@ renderTacrepDetailsInto = function(item, payload) {
 
       if (m.type === "attributes" && m.attributeName === "class") {
 
-        onMaybeRender(m.target);
+        if (m.target?.classList?.contains("item")) {
+          onMaybeRender(m.target);
+        }
 
       }
 
@@ -6986,47 +7066,62 @@ document.getElementById("faultTime").value = `${pad2(d.getUTCHours())}${pad2(d.g
 
     // Collaborative poll
 
-    setInterval(async ()=>{
+    const POLL_INTERVAL_MS = Math.max(2000, Number(POLL_MS) || 5000);
+    let collabPollTimer = null;
 
-      if(memoryMode||!useFS||!fileHandle||isSaving) return;
+    const shouldPollCollab = () => (
+      !memoryMode &&
+      useFS &&
+      !!fileHandle &&
+      !isSaving &&
+      document.visibilityState === "visible"
+    );
 
+    const runCollabPoll = async () => {
+      if(!shouldPollCollab()) return;
       try{
-
         const f=await fileHandle.getFile();
-
         if(f.lastModified>lastKnownMod){
-
           const txt=await f.text();
-
           const incoming=JSON.parse(txt||"{}");
-
           applyState(incoming);
-
           lastKnownMod=f.lastModified;
-
           dirty=false;
-
           showBanner("Remote changes detected. View updated.");
-
           recomputeHighlights();
-
           // Update history buttons after remote changes are applied (with small delay to ensure DOM is ready)
-
           setTimeout(() => {
-
             if (typeof updateAllHistoryButtons === 'function') {
-
               updateAllHistoryButtons();
-
             }
-
           }, 100);
-
         }
+      }catch(err){
+        console.error("Sync poll failed:", err);
+      }
+    };
 
-      }catch{}
+    const startCollabPolling = ()=>{
+      if (collabPollTimer) return;
+      collabPollTimer = setInterval(runCollabPoll, POLL_INTERVAL_MS);
+    };
 
-    }, POLL_MS);
+    const stopCollabPolling = ()=>{
+      if (!collabPollTimer) return;
+      clearInterval(collabPollTimer);
+      collabPollTimer = null;
+    };
+
+    document.addEventListener("visibilitychange", ()=>{
+      if (document.visibilityState === "visible") {
+        runCollabPoll();
+        startCollabPolling();
+      } else {
+        stopCollabPolling();
+      }
+    });
+
+    startCollabPolling();
 
 
 
@@ -7844,6 +7939,10 @@ state.changeHistory = changeHistory;
   const colEl=$$(`.column[data-column]`).find(c=> c.dataset.column===columnName);
 
   const prefix=colEl ? (colEl.dataset.letter || columnName[0]) : columnName[0];
+
+  if(!validateBearingFieldForType(columnName)){
+    return;
+  }
 
 
 
@@ -9896,6 +9995,10 @@ lastModified: now
   // Remove from Active UI
 
   itemEl.remove();
+  if(origin){
+    syncColumnNextNumber(origin);
+  }
+  usedNumberCache.clear();
 
 
 
@@ -9989,7 +10092,9 @@ function restoreItemFromDeleted(itemEl){
 
   const prefix = getPrefixFromColumnName(destColName);
 
-  const n = nextHighest(prefix);
+  const existingMax = getColumnMaxNumber(destColName);
+  const baseNumber = Number.isInteger(blockStartNum) && blockStartNum > 0 ? blockStartNum : 1;
+  const n = Number.isInteger(existingMax) ? existingMax + 1 : baseNumber;
 
 
 
@@ -10023,8 +10128,9 @@ function restoreItemFromDeleted(itemEl){
 
   dest.appendChild(newEl);
 
+  syncColumnNextNumber(destColName);
 
-
+  usedNumberCache.clear();
   recomputeHighlights();
 
 }
