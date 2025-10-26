@@ -11538,10 +11538,6 @@ function buildAbbrevList(p){
 
   const out=[];
 
-  if(p.reported){
-    out.push("REPORTED");
-  }
-
   const type = tacrepTypeFromCode(p.code || "") || "Other";
   const sel = getAbbrevPrefsForType(type);
 

@@ -350,7 +350,7 @@
         </div>
         <div>
           <label for="codeNumber">TACREP Number</label>
-          <input type="text" id="codeNumber" inputmode="numeric" placeholder="e.g., 304">
+          <input type="text" id="codeNumber" inputmode="numeric" placeholder="">
         </div>
       </div>
 
@@ -441,28 +441,28 @@
 
       <label for="ivoDescription" class="echo-only" style="display:none;">Description</label>
       <div class="row tight echo-only" style="display:none;">
-        <textarea id="ivoDescription" rows="2" placeholder="Describe IVO details..."></textarea>
+        <textarea id="ivoDescription" rows="2" placeholder=""></textarea>
         <input type="checkbox" class="abbrChk" data-field="ivo" title="Include in abbreviation">
       </div>
 
 <label>Latitude (D&deg; M' S.SS")</label>
 <div class="row tight">
-  <input type="text" id="latDeg" placeholder="Deg" inputmode="numeric" maxlength="2">
-  <input type="text" id="latMin" placeholder="Min" inputmode="numeric" maxlength="2">
-  <input type="text" id="latSec" placeholder="Sec" inputmode="numeric" maxlength="2">
+  <input type="text" id="latDeg" placeholder="" inputmode="numeric" maxlength="2">
+  <input type="text" id="latMin" placeholder="" inputmode="numeric" maxlength="2">
+  <input type="text" id="latSec" placeholder="" inputmode="numeric" maxlength="2">
   <span class="dot" aria-hidden="true">.</span>
-  <input type="text" id="latDecSec" placeholder="Dec Sec" inputmode="numeric" maxlength="2">
+  <input type="text" id="latDecSec" placeholder="" inputmode="numeric" maxlength="2">
   <select id="latHem"><option value="N">N</option><option value="S">S</option></select>
 </div>
 
 
   <label>Longitude (D&deg; M' S.SS")</label>
 <div class="row tight inline-check">
-  <input type="text" id="lonDeg" placeholder="Deg" inputmode="numeric" maxlength="3">
-  <input type="text" id="lonMin" placeholder="Min" inputmode="numeric" maxlength="2">
-  <input type="text" id="lonSec" placeholder="Sec" inputmode="numeric" maxlength="2">
+  <input type="text" id="lonDeg" placeholder="" inputmode="numeric" maxlength="3">
+  <input type="text" id="lonMin" placeholder="" inputmode="numeric" maxlength="2">
+  <input type="text" id="lonSec" placeholder="" inputmode="numeric" maxlength="2">
   <span class="dot" aria-hidden="true">.</span>
-  <input type="text" id="lonDecSec" placeholder="Dec Sec" inputmode="numeric" maxlength="2">
+  <input type="text" id="lonDecSec" placeholder="" inputmode="numeric" maxlength="2">
   <select id="lonHem"><option value="E">E</option><option value="W">W</option></select>
   <input type="checkbox" class="abbrChk" data-field="position" title="Include in abbreviation">
 </div>
@@ -498,28 +498,28 @@
       <div id="ownshipLatLonGroup" style="display:none;">
         <label>Ownship Latitude (D&deg; M' S.SS")</label>
         <div class="row tight">
-          <input type="text" id="ownLatDeg" placeholder="Deg" inputmode="numeric" maxlength="2">
-          <input type="text" id="ownLatMin" placeholder="Min" inputmode="numeric" maxlength="2">
-          <input type="text" id="ownLatSec" placeholder="Sec" inputmode="numeric" maxlength="2">
+          <input type="text" id="ownLatDeg" placeholder="" inputmode="numeric" maxlength="2">
+          <input type="text" id="ownLatMin" placeholder="" inputmode="numeric" maxlength="2">
+          <input type="text" id="ownLatSec" placeholder="" inputmode="numeric" maxlength="2">
           <span class="dot" aria-hidden="true">.</span>
-          <input type="text" id="ownLatDecSec" placeholder="Dec Sec" inputmode="numeric" maxlength="2">
+          <input type="text" id="ownLatDecSec" placeholder="" inputmode="numeric" maxlength="2">
           <select id="ownLatHem"><option value="N">N</option><option value="S">S</option></select>
         </div>
 
         <label>Ownship Longitude (D&deg; M' S.SS")</label>
         <div class="row tight inline-check">
-          <input type="text" id="ownLonDeg" placeholder="Deg" inputmode="numeric" maxlength="3">
-          <input type="text" id="ownLonMin" placeholder="Min" inputmode="numeric" maxlength="2">
-          <input type="text" id="ownLonSec" placeholder="Sec" inputmode="numeric" maxlength="2">
+          <input type="text" id="ownLonDeg" placeholder="" inputmode="numeric" maxlength="3">
+          <input type="text" id="ownLonMin" placeholder="" inputmode="numeric" maxlength="2">
+          <input type="text" id="ownLonSec" placeholder="" inputmode="numeric" maxlength="2">
           <span class="dot" aria-hidden="true">.</span>
-          <input type="text" id="ownLonDecSec" placeholder="Dec Sec" inputmode="numeric" maxlength="2">
+          <input type="text" id="ownLonDecSec" placeholder="" inputmode="numeric" maxlength="2">
           <select id="ownLonHem"><option value="E">E</option><option value="W">W</option></select>
         </div>
       </div>
 
       <label for="ownshipPosit" class="shape-only" style="display:none;">Ownship Posit</label>
       <div class="row tight inline-check shape-only" style="display:none;">
-        <input type="text" id="ownshipPosit" placeholder="Ownship position">
+        <input type="text" id="ownshipPosit" placeholder="">
         <input type="checkbox" class="abbrChk" data-field="ownshipPosit" title="Include in abbreviation">
       </div>
 
@@ -560,7 +560,7 @@
       </div>
       <label for="minotaurPaste">Minotaur Paste</label>
       <div class="row tight">
-        <textarea id="minotaurPaste" placeholder="Paste Minotaur data..." rows="3"></textarea>
+        <textarea id="minotaurPaste" placeholder="" rows="3"></textarea>
         <button type="button" id="minoCheckBtn" class="btn-ok" title="Parse Minotaur">Parse</button>
       </div>
 
