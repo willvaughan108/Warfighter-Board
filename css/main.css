@@ -65,8 +65,11 @@
   .select-mode .item.selectable.selected { outline-style: solid; }
   .item-header { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
   .badge-wrap { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .badge-stack { display:flex; flex-direction:column; align-items:flex-start; gap:2px; }
   .pm { display:inline-block; width:18px; text-align:center; font-weight:bold; color:#333; cursor:pointer; user-select:none; }
   .badge { background: var(--blue); color:#fff; padding:4px 10px; border-radius:6px; font-weight:bold; min-width:48px; text-align:center; cursor:pointer; user-select:none; }
+  .reported-pill { font-size:10px; padding:1px 8px; border-radius:999px; background: var(--danger); color:#fff; font-weight:700; letter-spacing:0.4px; text-transform:uppercase; }
+  .reported-pill.reported { background: var(--ok); }
   /* Make the Crew Details header look like plain text (not a button) */
 #crewDetailsTile .badge {
 background: transparent;

@@ -248,8 +248,10 @@
       <button class="avp-tile" id="btnChangeTypeCorrect" role="listitem" type="button"><span>Correct TACREP</span></button>
       <button class="avp-tile" id="btnChangeTypeUpdate" role="listitem" type="button"><span>Update TACREP</span></button>
     </div>
-    <div class="actions" style="margin-top:12px;">
+    <div class="actions" style="margin-top:12px; gap:8px; align-items:center;">
+      <button id="changeTypeReportedBtn" type="button" class="btn-danger" style="margin-right:auto;">Mark as Reported</button>
       <button id="btnChangeTypeCancel" class="btn-secondary" type="button">Cancel</button>
+      <button id="btnChangeTypeSave" type="button">Save</button>
     </div>
   </div>
 </div>
@@ -336,7 +338,6 @@
   <div class="content" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="row tight" id="entryHeaderRow" style="align-items:center; margin-bottom:10px;">
   <h3 id="modalTitle" style="margin:0; flex:1;">New TACREP</h3>
-  <button type="button" id="reportedBtn" class="btn-secondary" style="font-weight:bold; flex:0 0 50%;">UNREPORTED</button>
 </div>
     <form id="entryForm">
       <input type="hidden" id="targetColumn">

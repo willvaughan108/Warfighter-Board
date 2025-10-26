@@ -162,7 +162,8 @@ function nextHighest(prefix){
 
   let crewDetails = mkCrewDetailsDefaults();
 
-  let reportedFlag = false; // form-level flag synced with #reportedBtn
+  let reportedFlag = false; // form-level flag synced with change-type toggle
+  let reportedFlagTouched = false;
 
   let editingItem = null;   // currently edited TACREP card
 
@@ -1332,7 +1333,7 @@ function applyEntrySaveState(){
 
 function setEntryFormBaseline(){
   entryFormBaseline = captureEntryFormSnapshot();
-  entryFormDirty = false;
+  entryFormDirty = reportedFlagTouched ? true : false;
   applyEntrySaveState();
 }
 
@@ -2413,22 +2414,18 @@ function setAppEnabled(on){
 
 // === TACREP form open/close helpers (fixes "+" click freeze) ===
 
+function updateReportedToggleUI(){
+  const btn = document.getElementById("changeTypeReportedBtn");
+  if(!btn) return;
+  btn.textContent = reportedFlag ? "Mark as Unreported" : "Mark as Reported";
+  btn.classList.remove("btn-reported","btn-danger");
+  btn.classList.add(reportedFlag ? "btn-reported" : "btn-danger");
+}
+
 function setReportedBtn(on){
-
-  const btn = document.getElementById("reportedBtn");
-
-  if (!btn) return;
-
   reportedFlag = !!on;
-
-  btn.textContent = reportedFlag ? "REPORTED" : "UNREPORTED";
-
-  btn.className = reportedFlag ? "btn-reported" : "btn-secondary";
-
-  btn.style.fontWeight = "bold";
-
-  evaluateEntryFormDirty();
-
+  reportedFlagTouched = false;
+  updateReportedToggleUI();
 }
 
 
@@ -3063,7 +3060,11 @@ function fillEntryFormFromPayload(p){
 
 
 
-  setReportedBtn(!!p.reported);
+  if(!reportedFlagTouched){
+    setReportedBtn(!!p.reported);
+  } else {
+    updateReportedToggleUI();
+  }
 
 }
 
@@ -3095,6 +3096,7 @@ function resetEntryForm(){
 
   }
 
+  reportedFlagTouched = false;
   setReportedBtn(false);
 
   // Clear hidden edit fields
@@ -3130,10 +3132,23 @@ function openForm(columnName, existingPayload /* can be null */){
 
 
   const effectiveType = columnName || "Other";
+  const editing = !!(existingPayload && existingPayload.code);
+  const preservedReportedFlag = reportedFlag;
+  const preservedReportedTouched = reportedFlagTouched;
 
   // Reset then set context
 
   resetEntryForm();
+
+  if (editing) {
+    if (preservedReportedTouched) {
+      reportedFlag = preservedReportedFlag;
+      reportedFlagTouched = true;
+      updateReportedToggleUI();
+    } else {
+      setReportedBtn(!!(existingPayload && existingPayload.reported));
+    }
+  }
 
   targetCol.value = effectiveType;
 
@@ -3146,10 +3161,7 @@ function openForm(columnName, existingPayload /* can be null */){
   try { refreshAbbrevCheckboxesInModal(); } catch {}
 
 
-
   // Show edit header bits if editing
-
-  const editing = !!(existingPayload && existingPayload.code);
 
   const codeRow = document.getElementById("codeEditRow");
 
@@ -4077,31 +4089,15 @@ mtl.style.display = (name === 'MPO') ? '' : 'none';
 
 
 
-// Reported toggle button
-
-$("#reportedBtn").addEventListener("click", () => {
-
-  reportedFlag = !reportedFlag;
-
-  const btn = $("#reportedBtn");
-
-  if (reportedFlag) {
-
-    btn.textContent = "REPORTED";
-
-    btn.className = "btn-reported";
-
-  } else {
-
-    btn.textContent = "UNREPORTED";
-
-    btn.className = "btn-secondary";
-
-  }
-
-  btn.style.fontWeight = "bold";
-
-});
+const changeTypeReportedBtn = document.getElementById("changeTypeReportedBtn");
+if(changeTypeReportedBtn){
+  changeTypeReportedBtn.addEventListener("click", ()=>{
+    reportedFlag = !reportedFlag;
+    reportedFlagTouched = true;
+    updateReportedToggleUI();
+  });
+}
+updateReportedToggleUI();
 
 
 
@@ -4316,6 +4312,8 @@ function openChangeTypeChooser(itemEl){
 
     _changeMode = null;
     changeTypeSendRequired = false;
+    reportedFlagTouched = false;
+    setReportedBtn(!!payload.reported);
 
     openModal(document.getElementById("changeTypeModal"));
 
@@ -4355,14 +4353,65 @@ function openChangeTypeChooser(itemEl){
   const btnU = document.getElementById("btnChangeTypeUpdate");
 
   const btnX = document.getElementById("btnChangeTypeCancel");
+  const btnSave = document.getElementById("btnChangeTypeSave");
 
-  if (btnE) btnE.onclick = ()=>{ _changeMode = "edit";  changeTypeSendRequired = false; if (m) closeModal(m); if (_changeContext) { editingItem = _changeContext.itemEl || null; openForm(_changeContext.itemEl.closest('.column')?.dataset.column||"India", _changeContext.payload); } };
+  const launchEditFlow = (mode)=>{
+    _changeMode = mode;
+    changeTypeSendRequired = false;
+    if (m) closeModal(m);
+    if (_changeContext) {
+      editingItem = _changeContext.itemEl || null;
+      openForm(_changeContext.itemEl.closest('.column')?.dataset.column||"India", _changeContext.payload);
+    }
+  };
 
-  if (btnC) btnC.onclick = ()=>{ _changeMode = "correct"; changeTypeSendRequired = false; if (m) closeModal(m); if (_changeContext) { editingItem = _changeContext.itemEl || null; openForm(_changeContext.itemEl.closest('.column')?.dataset.column||"India", _changeContext.payload); } };
+  if (btnE) btnE.onclick = ()=> launchEditFlow("edit");
 
-  if (btnU) btnU.onclick = ()=>{ _changeMode = "update"; changeTypeSendRequired = false; if (m) closeModal(m); if (_changeContext) { editingItem = _changeContext.itemEl || null; openForm(_changeContext.itemEl.closest('.column')?.dataset.column||"India", _changeContext.payload); } };
+  if (btnC) btnC.onclick = ()=> launchEditFlow("correct");
 
-  if (btnX) btnX.onclick = ()=>{ _changeMode = null; _changeContext = null; changeTypeSendRequired = false; if (m) closeModal(m); };
+  if (btnU) btnU.onclick = ()=> launchEditFlow("update");
+
+  if (btnX) btnX.onclick = ()=>{
+    if (_changeContext && _changeContext.payload){
+      setReportedBtn(!!_changeContext.payload.reported);
+    }
+    _changeMode = null;
+    _changeContext = null;
+    changeTypeSendRequired = false;
+    if (m) closeModal(m);
+  };
+
+  if (btnSave) btnSave.onclick = async ()=>{
+    if (!_changeContext || !_changeContext.itemEl) {
+      if (m) closeModal(m);
+      return;
+    }
+    const item = _changeContext.itemEl;
+    let payload;
+    try { payload = JSON.parse(item.dataset.payload || "{}"); } catch { payload = {}; }
+    const desired = !!reportedFlag;
+    if (!reportedFlagTouched && !!payload.reported === desired) {
+      if (m) closeModal(m);
+      return;
+    }
+    payload.reported = desired;
+    item.dataset.payload = JSON.stringify(payload);
+    updateItemElement(item, payload);
+    _changeContext.payload = payload;
+
+    try{
+      dirty = true;
+      await syncAndSave();
+      showBanner(`TACREP ${payload.code || ""} marked ${desired ? "reported" : "unreported"}.`);
+    } catch(err){
+      console.error("Reported toggle save failed:", err);
+      showBanner("Unable to save reported status.");
+    }
+
+    reportedFlagTouched = false;
+    changeTypeSendRequired = false;
+    if (m) closeModal(m);
+  };
 
 })();
 
@@ -8521,7 +8570,11 @@ function findDeletedElementByCode(code){
 
   }
 
-
+  function applyReportedStatusEl(el, reported){
+    if (!el) return;
+    el.textContent = reported ? "REPORTED" : "UNREPORTED";
+    el.classList.toggle("reported", !!reported);
+  }
 
   function createItemElement(data, context="active"){
 
@@ -8541,9 +8594,15 @@ function findDeletedElementByCode(code){
 
     const pm=document.createElement("span"); pm.className="pm"; pm.textContent="+";
 
+    const badgeStack=document.createElement("div"); badgeStack.className="badge-stack";
     const badge=document.createElement("div"); badge.className="badge"; badge.textContent=code; badge.dataset.code=code; badge.tabIndex=0;
+    const statusLabel=document.createElement("span"); statusLabel.className="reported-pill";
 
-    badgeWrap.appendChild(pm); badgeWrap.appendChild(badge);
+    badgeWrap.appendChild(pm);
+    badgeWrap.appendChild(badgeStack);
+    badgeStack.appendChild(statusLabel);
+    badgeStack.appendChild(badge);
+    applyReportedStatusEl(statusLabel, data.reported);
 
 
 
@@ -8602,6 +8661,7 @@ function findDeletedElementByCode(code){
 
 
     item.appendChild(header); item.appendChild(details);
+    item._reportedStatusEl = statusLabel;
 
     item._renderAbbrev();
 
@@ -8652,6 +8712,7 @@ function findDeletedElementByCode(code){
     if(badgeEl){ badgeEl.textContent=data.code; badgeEl.dataset.code=data.code; }
 
     item._renderAbbrev && item._renderAbbrev();
+    applyReportedStatusEl(item._reportedStatusEl, data.reported);
 
     const details=item.querySelector(".item-details"); details.innerHTML=""; fillDetails(details,data,data.code);
 
@@ -11537,6 +11598,7 @@ function renderCreatorAndAbbrev(payload){
 
 
 })();
+
 
 
 
