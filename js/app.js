@@ -33,9 +33,59 @@
 
 
   if (typeof $ !== "function" || typeof $$ !== "function" || typeof pad2 !== "function" || typeof escapeHtml !== "function") {
-
     throw new Error("DOMUtils helpers not initialized");
+  }
 
+  /**
+   * Gracefully copy plain text to the clipboard with a DOM fallback.
+   * Returns a promise so callers can show UI feedback.
+   */
+  function writePlainTextToClipboard(value){
+    const text = String(value ?? "");
+    if (navigator?.clipboard?.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise((resolve, reject)=>{
+      try{
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "readonly");
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand && document.execCommand("copy");
+        document.body.removeChild(ta);
+        ok ? resolve() : reject(new Error("Browser denied copy command"));
+      }catch(err){
+        reject(err);
+      }
+    });
+  }
+
+  function setCopyButtonState(btn, label, stateClass){
+    if(!btn) return;
+    btn.textContent = label;
+    btn.classList.remove("copied","error");
+    if(stateClass) btn.classList.add(stateClass);
+  }
+
+  function copySlashLineToClipboard(text, btn){
+    if(!btn) return;
+    const originalLabel = btn.dataset.originalLabel || btn.textContent || "Copy";
+    btn.disabled = true;
+    setCopyButtonState(btn, "Copying...", null);
+    writePlainTextToClipboard(text).then(()=>{
+      setCopyButtonState(btn, "Copied!", "copied");
+    }).catch(()=>{
+      setCopyButtonState(btn, "Copy failed", "error");
+    }).finally(()=>{
+      setTimeout(()=>{
+        setCopyButtonState(btn, originalLabel, null);
+        btn.disabled = false;
+      }, 1500);
+    });
   }
 
 
@@ -307,6 +357,7 @@ const HISTORY_FIELD_MAP = {
     { key: "sensor", label: "Sensor" },
     { key: "position", label: "Position", custom: true },
     { key: "tq", label: "TQ" },
+    { key: "amplification", label: "Amplification" },
     { key: "course", label: "Course" },
     { key: "speed", label: "Speed" },
     { key: "trackNumber", label: "Track Number" },
@@ -397,11 +448,11 @@ const HISTORY_FIELD_MAP = {
   ]
 };
 
-  const DEFAULT_TACREP_FIELD_ORDER = {
+const DEFAULT_TACREP_FIELD_ORDER = {
 
     Echo: ["callsign","timeHHMM","systemOrPlatform","emitterName","activityOrFunction","frequency","majorAxis","minorAxis","orientation","position","course","speed","trackNumber","minVesselLen","additionalInfo"],
 
-    India: ["callsign","timeHHMM","position","vesselType","sensor","tq","course","speed","trackNumber","minVesselLen","additionalInfo"],
+    India: ["callsign","timeHHMM","position","vesselType","sensor","tq","amplification","course","speed","trackNumber","minVesselLen","additionalInfo"],
 
     AIS: ["timeHHMM","vesselType","vesselName","mmsi","position","course","speed","trackNumber","vesselFlag","imo","additionalInfo"],
 
@@ -2573,7 +2624,7 @@ function setReportedBtn(on){
 
 
 
-  const FIELD_GROUPS = {
+const FIELD_GROUPS = {
 
     time: show => toggleFieldRowById("timeZuluInput", show),
 
@@ -2631,11 +2682,30 @@ function setReportedBtn(on){
 
   };
 
+  const additionalInfoLabel = document.querySelector('label[for="additionalInfo"]');
+  const additionalInfoTextarea = document.getElementById("additionalInfo");
+  const additionalInfoAbbr = document.querySelector('.abbrChk[data-field="additionalInfo"]');
+
+  function applyAdditionalInfoLabel(type){
+    const useAmplification = type === "Echo" || type === "AIS";
+    const labelText = useAmplification ? "Amplification" : "Additional Info";
+    if (additionalInfoLabel) additionalInfoLabel.textContent = labelText;
+    if (additionalInfoTextarea){
+      additionalInfoTextarea.placeholder = useAmplification ? "Amplification details..." : "Additional information...";
+      additionalInfoTextarea.setAttribute("aria-label", labelText);
+    }
+    if (additionalInfoAbbr){
+      const desc = `Include ${labelText} in abbreviation`;
+      additionalInfoAbbr.title = desc;
+      additionalInfoAbbr.setAttribute("aria-label", desc);
+    }
+  }
+
 
 
 const FIELD_PRESETS = {
 
-  India: ["time","vesselType","sensor","position","course","speed","tq","trackNumber","minVesselLen","minotaur"],
+  India: ["time","vesselType","sensor","position","course","speed","tq","amplification","trackNumber","minVesselLen","minotaur"],
 
   AIS: ["time","vesselType","vesselName","mmsi","vesselFlag","imo","position","course","speed","trackNumber","additionalInfo"],
 
@@ -2888,6 +2958,8 @@ const FIELD_PRESETS = {
         select.value = "latlon";
       }
     }
+
+    applyAdditionalInfoLabel(type);
 
     if (usesPositionModes) {
 
@@ -3641,17 +3713,25 @@ renderTacrepDetailsInto = function(item, payload) {
 
 
   if (entries.length) {
-
     const slashLine = entries.map(entry => entry.value).join("/");
+    const slashWrap = document.createElement("div");
+    slashWrap.className = "detail detail-line-wrap";
 
     const span = document.createElement("span");
-
-    span.className = "detail detail-line";
-
+    span.className = "detail-line";
     span.textContent = slashLine;
 
-    details.appendChild(span);
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.className = "copy-pill copy-slash-btn";
+    copyBtn.dataset.originalLabel = "Copy slash";
+    copyBtn.textContent = "Copy slash";
+    copyBtn.setAttribute("aria-label", "Copy slash-formatted TACREP");
+    copyBtn.addEventListener("click", ()=> copySlashLineToClipboard(slashLine, copyBtn));
 
+    slashWrap.appendChild(span);
+    slashWrap.appendChild(copyBtn);
+    details.appendChild(slashWrap);
   }
 
 
