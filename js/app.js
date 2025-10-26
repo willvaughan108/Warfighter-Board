@@ -297,6 +297,7 @@ const ICON_PENCIL = '<svg aria-hidden="true" width="14" height="14" viewBox="0 0
 const ICON_X = '<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
 
 const TACREP_TYPES = ["India","Echo","AIS","Alpha","November","Golf","Other"];
+const ICON_RESTORE = '<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5"/></svg>'
 const POSITION_MODE_TYPES = new Set(["Echo","Alpha","November","Golf"]);
 const IVO_POSITION_TYPES = new Set(["Alpha","November","Golf"]);
 const HISTORY_FIELD_MAP = {
@@ -3798,6 +3799,15 @@ renderTacrepDetailsInto = function(item, payload) {
     $("#crewCancel").addEventListener("click", ()=>{ pendingMode=null; closeModal($("#crewModal")); });
 
     $("#crewApply").addEventListener("click", onCrewApply);
+    const crewInputEl = $("#crewInput");
+    if (crewInputEl) {
+      crewInputEl.addEventListener("keydown", (e)=>{
+        if (e.key === "Enter") {
+          e.preventDefault();
+          $("#crewApply")?.click();
+        }
+      });
+    }
 
     $("#blockCancel").addEventListener("click", ()=>{ pendingTacrepColumn=null; closeModal($("#blockModal")); });
 
@@ -4630,6 +4640,39 @@ ${body}` : header;
   openModal(modal);
 
 }
+
+function openConfirm(message, onConfirm){
+  const modal = document.getElementById("confirmModal");
+  const title = document.getElementById("confirmTitle");
+  const text  = document.getElementById("confirmText");
+  const btnNo = document.getElementById("confirmCancelBtn");
+  const btnYes= document.getElementById("confirmOkBtn");
+  if (!modal || !title || !text || !btnNo || !btnYes) return;
+
+  title.textContent = "Confirm";
+  text.textContent = message;
+  btnNo.textContent = "Cancel";
+  btnYes.textContent = "OK";
+
+  btnNo.onclick = ()=>{
+    btnNo.onclick = null;
+    btnYes.onclick = null;
+    closeModal(modal);
+  };
+  btnYes.onclick = ()=>{
+    btnNo.onclick = null;
+    btnYes.onclick = null;
+    closeModal(modal);
+    try{
+      if(typeof onConfirm === "function") onConfirm();
+    }catch(err){
+      console.error("Confirm handler failed:", err);
+    }
+  };
+
+  openModal(modal);
+}
+window.openConfirm = openConfirm;
 
 
 
@@ -8620,7 +8663,7 @@ function findDeletedElementByCode(code){
 
     const delBtn=document.createElement("button"); delBtn.type="button"; delBtn.className="icon-btn icon-delete"; delBtn.innerHTML=ICON_X; delBtn.title="Move to Deleted";
 
-    const restoreBtn=document.createElement("button"); restoreBtn.type="button"; restoreBtn.className="icon-btn icon-restore"; restoreBtn.innerHTML="??"; restoreBtn.title="Restore";
+    const restoreBtn=document.createElement("button"); restoreBtn.type="button"; restoreBtn.className="icon-btn icon-restore"; restoreBtn.innerHTML=ICON_RESTORE; restoreBtn.title="Restore";
 
 
 
@@ -8689,11 +8732,11 @@ function findDeletedElementByCode(code){
 
 
 
-    delBtn.addEventListener("click",(e)=>{ e.stopPropagation(); openConfirm(`Move TACREP <strong>${escapeHtml(code)}</strong> to Deleted?`, ()=>{ moveItemToDeleted(item); dirty=true; requestAutoSyncSave(true); recomputeHighlights(); }); });
+    delBtn.addEventListener("click",(e)=>{ e.stopPropagation(); openConfirm(`Move TACREP ${escapeHtml(code)} to Deleted?`, ()=>{ moveItemToDeleted(item); dirty=true; requestAutoSyncSave(true); recomputeHighlights(); }); });
 
 
 
-    restoreBtn.addEventListener("click",(e)=>{ e.stopPropagation(); openConfirm(`Restore TACREP <strong>${escapeHtml(code)}</strong>?`, ()=>{ restoreItemFromDeleted(item); dirty=true; requestAutoSyncSave(true); recomputeHighlights(); }); });
+    restoreBtn.addEventListener("click",(e)=>{ e.stopPropagation(); openConfirm(`Restore TACREP ${escapeHtml(code)}?`, ()=>{ restoreItemFromDeleted(item); dirty=true; requestAutoSyncSave(true); recomputeHighlights(); }); });
 
 
 
@@ -10005,16 +10048,12 @@ function toggleSelectForCorrelation(item){
 function updateCorrelationMeta(card){
 
   const d=new Date(Number(card.dataset.lastAt||0));
-
-  const meta=`${card.dataset.lastBy || card.dataset.createdBy || "--"} • ${fmtDateNoYearUTC(d)} ${fmtTimeUTC(d)}`;
-
+  const owner = card.dataset.lastBy || card.dataset.createdBy || "--";
+  const meta = `${owner} - ${fmtDateNoYearUTC(d)} ${fmtTimeUTC(d)}`;
   const creator=card.querySelector(".creator");
-
   if(creator) creator.textContent = meta;
 
 }
-
-
 
 function currentCodesFromCard(card){
 
@@ -10057,47 +10096,27 @@ function renderBadgesInto(card, codes){
     if(card._removeMode){
 
       const x=document.createElement("button");
-
       x.type="button";
-
-      x.textContent="Ãâ";
-
+      x.className="icon-btn icon-delete";
+      x.innerHTML=ICON_X;
       x.title="Remove from correlation";
-
-      x.style.cssText="margin-left:4px;padding:0 6px;border:none;border-radius:6px;background:#c62828;color:#fff;cursor:pointer;height:22px;line-height:22px;";
-
+      x.style.marginLeft="4px";
       x.addEventListener("click", (e)=>{
-
         e.stopPropagation();
-
         const list=currentCodesFromCard(card);
-
         if(list.length<=2){ showBanner("A correlation must have at least 2 TACREPs."); return; }
-
         const idx=list.indexOf(code);
-
         if(idx>-1){
-
           list.splice(idx,1);
-
           card.dataset.codes = list.join("|");
-
           card.dataset.lastBy = crewPosition || "";
-
           card.dataset.lastAt = String(Date.now());
-
           renderBadgesInto(card, list);
-
           updateCorrelationActions(card);
-
           updateCorrelationMeta(card);
-
           dirty=true; requestAutoSyncSave();
-
         }
-
       });
-
       wrap.appendChild(x);
 
     }
