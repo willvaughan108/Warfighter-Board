@@ -1665,6 +1665,14 @@ const editingCode = (document.getElementById("editingCode")?.value || "").trim()
 
 if (!editingCode) return; // not editing -> let existing handler create new
 
+if(!entryFormDirty){
+  e.preventDefault();
+  if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
+  return;
+}
+
+const requiresSendFlow = (_changeMode === "correct" || _changeMode === "update");
+
 
 
 // We are editing: prevent any other submit handlers from running
@@ -1701,9 +1709,13 @@ try {
 
     showBanner("TACREP updated.");
 
+    changeTypeSendRequired = requiresSendFlow;
+
   } else {
 
     showBanner("Unable to locate existing TACREP to update.");
+
+    changeTypeSendRequired = false;
 
   }
 
@@ -1713,11 +1725,13 @@ try {
 
   showBanner("Edit failed. Check console.");
 
+  changeTypeSendRequired = false;
+
 } finally {
 
   // Always close modal AFTER save completes (or on error)
 
-  closeForm();
+  closeForm({ preserveChangeMode: requiresSendFlow && changeTypeSendRequired });
 
 }
 
@@ -1914,6 +1928,7 @@ function td(s){ return `<td>${String(s ?? "")}</td>`; }
 
 
 const groups = new Map(); // type -> { headers, rows }
+const correlationLookup = buildCorrelationLookup();
 
 document.querySelectorAll('.column[data-column]:not([data-column="Deleted"]):not([data-column="History"]):not([data-column="Correlations"]):not([data-column="MissionDetails"]):not([data-column="MissionTimeline"]) .item').forEach(it=>{
 
@@ -1929,7 +1944,7 @@ if(!p || !p.code) return; // only export real TACREPs
 
   const labels = getTacrepFieldLabels(t, true);
 
-  const headers = ["Code"].concat(labels, ["CreatedBy","CreatedAt"]);
+  const headers = ["Code"].concat(labels, ["Correlations","CreatedBy","CreatedAt"]);
 
   const row = [p.code || ""]
 
@@ -1937,6 +1952,7 @@ if(!p || !p.code) return; // only export real TACREPs
 
     .concat([
 
+      formatCorrelationCell(p.code, correlationLookup),
       p.createdBy || "",
 
       p.createdAt ? new Date(p.createdAt).toISOString() : ""
@@ -1962,6 +1978,28 @@ if(!p || !p.code) return; // only export real TACREPs
 });
 
 
+
+
+function formatCorrelationCell(code, lookup){
+  const arr = lookup[code] || [];
+  if(!arr.length) return "";
+  return arr.join("; ");
+}
+
+function buildCorrelationLookup(){
+  const map = {};
+  const cards = Array.from(document.querySelectorAll("#correlationItems .item"));
+  cards.forEach(card=>{
+    const codes = (card.dataset.codes || "").split("|").map(c=>c.trim()).filter(Boolean);
+    codes.forEach(code=>{
+      if(!map[code]) map[code]=new Set();
+      codes.filter(other=> other && other !== code).forEach(other=> map[code].add(other));
+    });
+  });
+  const out={};
+  Object.keys(map).forEach(code=>{ out[code]=Array.from(map[code]).sort((a,b)=>a.localeCompare(b)); });
+  return out;
+}
 
 // Build Mission Timeline rows (defensive)
 
@@ -4381,12 +4419,11 @@ openChangeTypeChooser(itemEl);
 function composeTacrepInfoText(p){
 
   const type = tacrepTypeFromCode(p?.code) || "Other";
-
-  return collectTacrepFields(type, p)
-
-    .map(entry => `${entry.settingsLabel || entry.label}: ${entry.value}`)
-
-    .join("\n");
+  const fields = collectTacrepFields(type, p)
+    .map(entry => String(entry.value || "").trim())
+    .filter(Boolean);
+  if (!fields.length) return "";
+  return fields.join(" / ");
 
 }
 
@@ -7625,7 +7662,6 @@ state.changeHistory = changeHistory;
 
   if(!Number.isInteger(blockStartNum) || !crewPosition){ alert("Set up mission first."); return; }
 
-  changeTypeSendRequired = false;
   const requiresSendFlow = (_changeMode === "correct" || _changeMode === "update");
 
 
