@@ -260,6 +260,100 @@ function nextHighest(prefix, columnName){
     columnNextNumber[columnName] = (max===null) ? base : (max + 1);
   }
 
+  function clearElement(el){
+    if(!el) return;
+    while(el.firstChild){
+      el.removeChild(el.firstChild);
+    }
+  }
+
+  function appendRow(tbody, cells){
+    if(!tbody) return;
+    const tr = document.createElement("tr");
+    cells.forEach(value => {
+      const tdEl = document.createElement("td");
+      tdEl.textContent = value == null ? "" : String(value);
+      tr.appendChild(tdEl);
+    });
+    tbody.appendChild(tr);
+  }
+
+  const ICON_PENCIL = '<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+  const ICON_X = '<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+  const ICON_RESTORE = '<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5"/></svg>';
+  const HISTORY_ICON_HTML = '<span aria-hidden="true">\u23F2\uFE0E</span>';
+  const SVG_NS = "http://www.w3.org/2000/svg";
+
+  function createHistoryIcon(){
+    const span = document.createElement("span");
+    span.setAttribute("aria-hidden", "true");
+    span.textContent = "\u23F2\uFE0E";
+    return span;
+  }
+
+  function buildSvgIcon(buildChildren){
+    const svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("width", "14");
+    svg.setAttribute("height", "14");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    buildChildren(svg);
+    return svg;
+  }
+
+  function createPencilIcon(){
+    return buildSvgIcon(svg => {
+      const path1 = document.createElementNS(SVG_NS, "path");
+      path1.setAttribute("d", "M12 20h9");
+      svg.appendChild(path1);
+      const path2 = document.createElementNS(SVG_NS, "path");
+      path2.setAttribute("d", "M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z");
+      svg.appendChild(path2);
+    });
+  }
+
+  function createXIcon(){
+    return buildSvgIcon(svg => {
+      const path = document.createElementNS(SVG_NS, "path");
+      path.setAttribute("d", "M18 6L6 18M6 6l12 12");
+      svg.appendChild(path);
+    });
+  }
+
+  function createRestoreIcon(){
+    return buildSvgIcon(svg => {
+      const poly = document.createElementNS(SVG_NS, "polyline");
+      poly.setAttribute("points", "1 4 1 10 7 10");
+      svg.appendChild(poly);
+      const path = document.createElementNS(SVG_NS, "path");
+      path.setAttribute("d", "M3.51 15a9 9 0 1 0 .49-5");
+      svg.appendChild(path);
+    });
+  }
+
+  const SAFE_STATIC_BUILDERS = new Map([
+    [HISTORY_ICON_HTML, createHistoryIcon],
+    [ICON_PENCIL, createPencilIcon],
+    [ICON_X, createXIcon],
+    [ICON_RESTORE, createRestoreIcon]
+  ]);
+
+  function appendStaticHTML(el, html){
+    if(!el) return;
+    const builder = SAFE_STATIC_BUILDERS.get(html);
+    clearElement(el);
+    if (builder) {
+      el.appendChild(builder());
+    } else if (typeof html === "string") {
+      el.textContent = html;
+    }
+  }
+
   let deletedSetLocal = new Set();
 
   let historyCodesLocal = new Set();
@@ -340,17 +434,16 @@ function nextHighest(prefix, columnName){
 
     el.dataset.historyId = p.id || "";
 
-    el.innerHTML = `
-
-      <div class="item-header">
-
-        <div class="creator">${escapeHtml(p.line || "")}</div>
-
-        <div class="item-actions"></div>
-
-      </div>
-
-    `;
+    const header = document.createElement("div");
+    header.className = "item-header";
+    const creator = document.createElement("div");
+    creator.className = "creator";
+    creator.textContent = p.line ? String(p.line) : "";
+    const actions = document.createElement("div");
+    actions.className = "item-actions";
+    header.appendChild(creator);
+    header.appendChild(actions);
+    el.appendChild(header);
 
     return el;
 
@@ -382,11 +475,8 @@ const DEFAULT_ABBREV_BY_TYPE = {
 };
 const DEFAULT_ABBREV_FALLBACK = ["time","vesselType","sensor"];
 const ABBREV_STORAGE_KEY = "wf_abbrev_prefs_by_type_v2";
-const ICON_PENCIL = '<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
-const ICON_X = '<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
 
 const TACREP_TYPES = ["India","Echo","AIS","Alpha","November","Golf","Other"];
-const ICON_RESTORE = '<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5"/></svg>'
 const POSITION_MODE_TYPES = new Set(["Echo","Alpha","November","Golf"]);
 const IVO_POSITION_TYPES = new Set(["Alpha","November","Golf"]);
 const BEARING_LIMIT_TYPES = new Set(["Alpha","November","Golf"]);
@@ -1106,7 +1196,7 @@ function buildTacrepFormatModal(){
 
   if (!container) return;
 
-  container.innerHTML = "";
+  clearElement(container);
 
 
 
@@ -2050,7 +2140,6 @@ try {
 
 function openExportPreview(){
 
-function td(s){ return `<td>${String(s ?? "")}</td>`; }
 
 
 
@@ -2189,23 +2278,9 @@ timelineItems.forEach(p=>{
 const metaBody = document.getElementById("exportBodyMissionMeta");
 
 if (metaBody) {
-
-metaBody.innerHTML = "";
-
-const r1 = document.createElement("tr");
-
-r1.innerHTML = td("Callsign") + td(typeof callsign === "string" ? callsign : "");
-
-metaBody.appendChild(r1);
-
-
-
-const r2 = document.createElement("tr");
-
-r2.innerHTML = td("Mission Number") + td(typeof missionNumber === "string" ? missionNumber : "");
-
-metaBody.appendChild(r2);
-
+  clearElement(metaBody);
+  appendRow(metaBody, ["Callsign", typeof callsign === "string" ? callsign : ""]);
+  appendRow(metaBody, ["Mission Number", typeof missionNumber === "string" ? missionNumber : ""]);
 }
 
 
@@ -2213,48 +2288,28 @@ metaBody.appendChild(r2);
 const crewBody = document.getElementById("exportBodyCrewDetails");
 
 if (crewBody) {
-
-  crewBody.innerHTML = "";
-
+  clearElement(crewBody);
   const shifts = (crewDetails && Array.isArray(crewDetails.shifts)) ? crewDetails.shifts : [];
-
   const labels = ["Shift 1","Shift 2","Shift 3","Shift 4"];
-
   shifts.forEach((s, idx) => {
-
-    const tr = document.createElement("tr");
-
-    tr.innerHTML = [
-
+    appendRow(crewBody, [
       labels[idx] || `Shift ${idx+1}`,
-
       s?.turnover || "",
-
       s?.mc || "",
-
       s?.tc || "",
-
       s?.uac || "",
-
       s?.sc || "",
-
       s?.mpo1 || "",
-
       s?.mpo2 || ""
-
-    ].map(td).join("");
-
-    crewBody.appendChild(tr);
-
+    ]);
   });
-
 }
 
 
 
 const container = document.getElementById("exportTacrepsGrouped");
 
-if (container) container.innerHTML = "";
+if (container) clearElement(container);
 
 const ORDER = ["India","Echo","AIS","Alpha","November","Golf","Other"];
 
@@ -2301,13 +2356,7 @@ thead.appendChild(trh);
 const tbody = document.createElement("tbody");
 
 rows.forEach(r=>{
-
-const tr = document.createElement("tr");
-
-tr.innerHTML = r.map(td).join("");
-
-tbody.appendChild(tr);
-
+  appendRow(tbody, r);
 });
 
 tbl.appendChild(thead);
@@ -2328,18 +2377,12 @@ container.appendChild(tbl);
 
 const $t2 = document.getElementById("exportBodyTimeline");
 
-if ($t2) $t2.innerHTML = "";
+if ($t2) clearElement($t2);
 
 if ($t2){
 
 timelineRows.forEach(r=>{
-
-const tr = document.createElement("tr");
-
-tr.innerHTML = r.map(td).join("");
-
-$t2.appendChild(tr);
-
+  appendRow($t2, r);
 });
 
 }
@@ -3753,7 +3796,7 @@ renderTacrepDetailsInto = function(item, payload) {
 
   details.dataset.rendering = "1";
 
-  details.innerHTML = "";
+  clearElement(details);
 
 
 
@@ -3770,11 +3813,11 @@ renderTacrepDetailsInto = function(item, payload) {
     if (!val) return;
 
     const span = document.createElement("span");
-
     span.className = "detail";
-
-    span.innerHTML = `<em>${escapeHtml(label)}:</em> ${escapeHtml(val)}`;
-
+    const em = document.createElement("em");
+    em.textContent = `${label}:`;
+    span.appendChild(em);
+    span.appendChild(document.createTextNode(` ${val}`));
     details.appendChild(span);
 
   };
@@ -6504,210 +6547,171 @@ if (offStaBtn) {
 
 
     // Open a dedicated popup window for OFFSTA entry
-
     const w = window.open("", "wf_offsta_popup", "width=820,height=560");
-
-    const html = `<!doctype html>
-
-      <html>
-
-      <head>
-
-        <meta charset="utf-8">
-
-       <title>New OFFSTA Report</title>
-
-
-
-        <style>
-
-          body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:16px;background:#f7f8fb;color:#111}
-
-          .row{display:flex;gap:8px;align-items:center;margin-bottom:10px}
-
-          .row label{min-width:160px}
-
-          input,select,button{font-size:14px;padding:8px;border:1px solid #cbd5e1;border-radius:8px}
-
-          input{width:100%}
-
-          .deg{width:80px}
-
-          .min{width:80px}
-
-          .sec{width:80px}
-
-          .dec{width:100px}
-
-          .hem{width:80px}
-
-          .actions{display:flex;gap:8px;margin-top:14px}
-
-          .title{font-weight:700;font-size:18px;margin-bottom:12px}
-
-          .muted{color:#6b7280}
-
-        </style>
-
-      </head>
-
-      <body>
-
-<div class="title">New OFFSTA Report</div>
-
-
-
-
-
-        <div class="row">
-
-          <label for="p_osTime">Time (Zulu)</label>
-
-          <input id="p_osTime" placeholder="HHMM" maxlength="4">
-
-          <span class="muted">HHMM</span>
-
-        </div>
-
-
-
-        <div class="row"><strong>Latitude (DÃÂ° M' S.SS")</strong></div>
-
-        <div class="row">
-
-          <input id="p_osLatDeg" class="deg" placeholder="Deg" maxlength="2">
-
-          <input id="p_osLatMin" class="min" placeholder="Min" maxlength="2">
-
-          <input id="p_osLatSec" class="sec" placeholder="Sec" maxlength="2">
-
-          <span class="muted">.</span>
-
-          <input id="p_osLatDecSec" class="dec" placeholder="Dec Sec" maxlength="2">
-
-          <select id="p_osLatHem" class="hem">
-
-            <option value="N" selected>N</option>
-
-            <option value="S">S</option>
-
-          </select>
-
-        </div>
-
-
-
-        <div class="row"><strong>Longitude (DÃÂ° M' S.SS")</strong></div>
-
-        <div class="row">
-
-          <input id="p_osLonDeg" class="deg" placeholder="Deg" maxlength="3">
-
-          <input id="p_osLonMin" class="min" placeholder="Min" maxlength="2">
-
-          <input id="p_osLonSec" class="sec" placeholder="Sec" maxlength="2">
-
-          <span class="muted">.</span>
-
-          <input id="p_osLonDecSec" class="dec" placeholder="Dec Sec" maxlength="2">
-
-          <select id="p_osLonHem" class="hem">
-
-            <option value="E" selected>E</option>
-
-            <option value="W">W</option>
-
-          </select>
-
-        </div>
-
-
-
-        <div class="row">
-
-          <label for="p_osAlt">Altitude</label>
-
-          <input id="p_osAlt" placeholder="e.g., 12500">
-
-        </div>
-
-
-
-        <div class="actions">
-
-          <button id="p_cancel" type="button">Cancel</button>
-
-          <button id="p_save" type="button">Save</button>
-
-        </div>
-
-
-
-        <script>
-
-          document.getElementById("p_cancel").addEventListener("click", ()=> window.close());
-
-          document.getElementById("p_save").addEventListener("click", ()=>{
-
-            const data = {
-
-              time: (document.getElementById("p_osTime").value || "").trim(),
-
-              latDeg: (document.getElementById("p_osLatDeg").value || "").trim(),
-
-              latMin: (document.getElementById("p_osLatMin").value || "").trim(),
-
-              latSec: (document.getElementById("p_osLatSec").value || "").trim(),
-
-              latDecSec: (document.getElementById("p_osLatDecSec").value || "").trim(),
-
-              latHem: (document.getElementById("p_osLatHem").value || "N"),
-
-              lonDeg: (document.getElementById("p_osLonDeg").value || "").trim(),
-
-              lonMin: (document.getElementById("p_osLonMin").value || "").trim(),
-
-              lonSec: (document.getElementById("p_osLonSec").value || "").trim(),
-
-              lonDecSec: (document.getElementById("p_osLonDecSec").value || "").trim(),
-
-              lonHem: (document.getElementById("p_osLonHem").value || "E"),
-
-              altitude: (document.getElementById("p_osAlt").value || "").trim()
-
-            };
-
-            try{
-
-              if(window.opener){
-
-                window.opener.postMessage({ type: "WF_OFFSTA_SAVE", data }, "*");
-
-              }
-
-            }catch{}
-
-            window.close();
-
-          });
-
-          window.addEventListener("keydown", (e)=>{ if(e.key==="Escape") window.close(); });
-
-        <\/script>
-
-      </body>
-
-      </html>`;
-
-
-
-
-
-    w.document.open();
-
-    w.document.write(html);
-
-    w.document.close();
+    if(!w) return;
+    const doc = w.document;
+    const head = doc.head || doc.createElement("head");
+    if(!doc.head){
+      doc.documentElement.insertBefore(head, doc.documentElement.firstChild || null);
+    }
+    clearElement(head);
+    const meta = doc.createElement("meta");
+    meta.setAttribute("charset","utf-8");
+    head.appendChild(meta);
+    const styleEl = doc.createElement("style");
+    styleEl.textContent = `body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:16px;background:#f7f8fb;color:#111}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+.row label{min-width:160px}
+input,select,button{font-size:14px;padding:8px;border:1px solid #cbd5e1;border-radius:8px}
+input{width:100%}
+.deg{width:80px}
+.min{width:80px}
+.sec{width:80px}
+.dec{width:100px}
+.hem{width:80px}
+.actions{display:flex;gap:8px;margin-top:14px}
+.title{font-weight:700;font-size:18px;margin-bottom:12px}
+.muted{color:#6b7280}`;
+    head.appendChild(styleEl);
+    doc.title = "New OFFSTA Report";
+
+    const body = doc.body || doc.createElement("body");
+    if(!doc.body){
+      doc.documentElement.appendChild(body);
+    }
+    clearElement(body);
+
+    const titleEl = doc.createElement("div");
+    titleEl.className = "title";
+    titleEl.textContent = "New OFFSTA Report";
+    body.appendChild(titleEl);
+
+    const makeRow = (...nodes)=>{
+      const row = doc.createElement("div");
+      row.className = "row";
+      nodes.forEach(node => row.appendChild(node));
+      body.appendChild(row);
+      return row;
+    };
+
+    const createInput = (id, className, placeholder, maxLength)=>{
+      const input = doc.createElement("input");
+      input.id = id;
+      if(className) input.className = className;
+      if(placeholder) input.placeholder = placeholder;
+      if(maxLength) input.maxLength = maxLength;
+      return input;
+    };
+
+    const timeLabel = doc.createElement("label");
+    timeLabel.setAttribute("for","p_osTime");
+    timeLabel.textContent = "Time (Zulu)";
+    const timeInput = createInput("p_osTime", "", "HHMM", 4);
+    const timeHint = doc.createElement("span");
+    timeHint.className = "muted";
+    timeHint.textContent = "HHMM";
+    makeRow(timeLabel, timeInput, timeHint);
+
+    const latHeading = doc.createElement("div");
+    latHeading.className = "row";
+    const latStrong = doc.createElement("strong");
+    latStrong.textContent = `Latitude (D° M' S.SS")`;
+    latHeading.appendChild(latStrong);
+    body.appendChild(latHeading);
+
+    const latDeg = createInput("p_osLatDeg", "deg", "Deg", 2);
+    const latMin = createInput("p_osLatMin", "min", "Min", 2);
+    const latSec = createInput("p_osLatSec", "sec", "Sec", 2);
+    const latDot = doc.createElement("span");
+    latDot.className = "muted";
+    latDot.textContent = ".";
+    const latDec = createInput("p_osLatDecSec", "dec", "Dec Sec", 2);
+    const latHem = doc.createElement("select");
+    latHem.id = "p_osLatHem";
+    latHem.className = "hem";
+    const latOptionN = doc.createElement("option");
+    latOptionN.value = "N";
+    latOptionN.selected = true;
+    latOptionN.textContent = "N";
+    const latOptionS = doc.createElement("option");
+    latOptionS.value = "S";
+    latOptionS.textContent = "S";
+    latHem.appendChild(latOptionN);
+    latHem.appendChild(latOptionS);
+    makeRow(latDeg, latMin, latSec, latDot, latDec, latHem);
+
+    const lonHeading = doc.createElement("div");
+    lonHeading.className = "row";
+    const lonStrong = doc.createElement("strong");
+    lonStrong.textContent = `Longitude (D° M' S.SS")`;
+    lonHeading.appendChild(lonStrong);
+    body.appendChild(lonHeading);
+
+    const lonDeg = createInput("p_osLonDeg", "deg", "Deg", 3);
+    const lonMin = createInput("p_osLonMin", "min", "Min", 2);
+    const lonSec = createInput("p_osLonSec", "sec", "Sec", 2);
+    const lonDot = doc.createElement("span");
+    lonDot.className = "muted";
+    lonDot.textContent = ".";
+    const lonDec = createInput("p_osLonDecSec", "dec", "Dec Sec", 2);
+    const lonHem = doc.createElement("select");
+    lonHem.id = "p_osLonHem";
+    lonHem.className = "hem";
+    const lonOptionE = doc.createElement("option");
+    lonOptionE.value = "E";
+    lonOptionE.selected = true;
+    lonOptionE.textContent = "E";
+    const lonOptionW = doc.createElement("option");
+    lonOptionW.value = "W";
+    lonOptionW.textContent = "W";
+    lonHem.appendChild(lonOptionE);
+    lonHem.appendChild(lonOptionW);
+    makeRow(lonDeg, lonMin, lonSec, lonDot, lonDec, lonHem);
+
+    const altLabel = doc.createElement("label");
+    altLabel.setAttribute("for","p_osAlt");
+    altLabel.textContent = "Altitude";
+    const altInput = createInput("p_osAlt", "", "e.g., 12500");
+    makeRow(altLabel, altInput);
+
+    const actionsRow = doc.createElement("div");
+    actionsRow.className = "actions";
+    const cancelBtn = doc.createElement("button");
+    cancelBtn.id = "p_cancel";
+    cancelBtn.type = "button";
+    cancelBtn.textContent = "Cancel";
+    const saveBtn = doc.createElement("button");
+    saveBtn.id = "p_save";
+    saveBtn.type = "button";
+    saveBtn.textContent = "Save";
+    actionsRow.appendChild(cancelBtn);
+    actionsRow.appendChild(saveBtn);
+    body.appendChild(actionsRow);
+
+    cancelBtn.addEventListener("click", ()=> w.close());
+    saveBtn.addEventListener("click", ()=>{
+      const data = {
+        time: (timeInput.value || "").trim(),
+        latDeg: (latDeg.value || "").trim(),
+        latMin: (latMin.value || "").trim(),
+        latSec: (latSec.value || "").trim(),
+        latDecSec: (latDec.value || "").trim(),
+        latHem: latHem.value || "N",
+        lonDeg: (lonDeg.value || "").trim(),
+        lonMin: (lonMin.value || "").trim(),
+        lonSec: (lonSec.value || "").trim(),
+        lonDecSec: (lonDec.value || "").trim(),
+        lonHem: lonHem.value || "E",
+        altitude: (altInput.value || "").trim()
+      };
+      try{
+        if(w.opener){
+          w.opener.postMessage({ type: "WF_OFFSTA_SAVE", data }, "*");
+        }
+      }catch{}
+      w.close();
+    });
+    w.addEventListener("keydown", (ev)=>{ if(ev.key==="Escape") w.close(); });
 
   }, true);
 
@@ -7551,13 +7555,13 @@ crewDetails
 
 // Clear all TACREP columns (but not History, MissionDetails, or MissionTimeline)
 
-document.querySelectorAll('.column[data-column]:not([data-column="MissionDetails"]):not([data-column="MissionTimeline"]):not([data-column="History"]) .items').forEach(div=> div.innerHTML="");
+document.querySelectorAll('.column[data-column]:not([data-column="MissionDetails"]):not([data-column="MissionTimeline"]):not([data-column="History"]) .items').forEach(div=> clearElement(div));
 
 
 
 const faultList = document.getElementById("faultItems");
 
-if (faultList) { faultList.innerHTML = ""; }
+if (faultList) { clearElement(faultList); }
 
     if (Array.isArray(state.faults)) {
 
@@ -7585,7 +7589,7 @@ if (faultList) { faultList.innerHTML = ""; }
 
 const historyList = document.getElementById("historyItems");
 
-if (historyList) { historyList.innerHTML = ""; } // Clear history before loading
+if (historyList) { clearElement(historyList); } // Clear history before loading
 
 historyCodesLocal.clear();
 
@@ -7635,7 +7639,7 @@ const mtlList = document.getElementById("missionTimelineItems");
 
 
 
-if (mtlList) { mtlList.innerHTML = ""; }
+if (mtlList) { clearElement(mtlList); }
 
 
 
@@ -8561,13 +8565,17 @@ function findDeletedElementByCode(code){
 
     title.textContent = `History: ${code}`;
 
-    content.innerHTML = "";
+    clearElement(content);
 
 
 
     if (versions.length === 0) {
 
-      content.innerHTML = "<p style='text-align:center; color:#6c757d;'>No history found.</p>";
+      const msg = document.createElement("p");
+      msg.style.textAlign = "center";
+      msg.style.color = "#6c757d";
+      msg.textContent = "No history found.";
+      content.appendChild(msg);
 
     } else {
 
@@ -8836,13 +8844,13 @@ function findDeletedElementByCode(code){
 
     const actions=document.createElement("div"); actions.className="item-actions";
 
-    const historyBtn=document.createElement("button"); historyBtn.type="button"; historyBtn.className="icon-btn icon-history"; historyBtn.innerHTML = "<span aria-hidden=\"true\">\u23F2\uFE0E</span>"; historyBtn.setAttribute("aria-label","View History"); historyBtn.title="View History";
+    const historyBtn=document.createElement("button"); historyBtn.type="button"; historyBtn.className="icon-btn icon-history"; appendStaticHTML(historyBtn, HISTORY_ICON_HTML); historyBtn.setAttribute("aria-label","View History"); historyBtn.title="View History";
 
-    const editBtn=document.createElement("button"); editBtn.type="button"; editBtn.className="icon-btn icon-edit"; editBtn.innerHTML=ICON_PENCIL; editBtn.title="Edit";
+    const editBtn=document.createElement("button"); editBtn.type="button"; editBtn.className="icon-btn icon-edit"; appendStaticHTML(editBtn, ICON_PENCIL); editBtn.title="Edit";
 
-    const delBtn=document.createElement("button"); delBtn.type="button"; delBtn.className="icon-btn icon-delete"; delBtn.innerHTML=ICON_X; delBtn.title="Move to Deleted";
+    const delBtn=document.createElement("button"); delBtn.type="button"; delBtn.className="icon-btn icon-delete"; appendStaticHTML(delBtn, ICON_X); delBtn.title="Move to Deleted";
 
-    const restoreBtn=document.createElement("button"); restoreBtn.type="button"; restoreBtn.className="icon-btn icon-restore"; restoreBtn.innerHTML=ICON_RESTORE; restoreBtn.title="Restore";
+    const restoreBtn=document.createElement("button"); restoreBtn.type="button"; restoreBtn.className="icon-btn icon-restore"; appendStaticHTML(restoreBtn, ICON_RESTORE); restoreBtn.title="Restore";
 
 
 
@@ -8936,7 +8944,7 @@ function findDeletedElementByCode(code){
     item._renderAbbrev && item._renderAbbrev();
     applyReportedStatusEl(item._reportedStatusEl, data.reported);
 
-    const details=item.querySelector(".item-details"); details.innerHTML=""; fillDetails(details,data,data.code);
+    const details=item.querySelector(".item-details"); clearElement(details); fillDetails(details,data,data.code);
 
   }
 
@@ -9280,7 +9288,7 @@ function updateTimelineItem(item, payload){
 
   const details = item.querySelector(".item-details");
 
-  details.innerHTML = "";
+  clearElement(details);
 
 
 
@@ -9518,7 +9526,7 @@ function createTimelineItem(p){
 
   editBtn.className = "icon-btn icon-edit";
 
-  editBtn.innerHTML = ICON_PENCIL;
+  appendStaticHTML(editBtn, ICON_PENCIL);
 
   editBtn.title = "Edit";
 
@@ -9530,7 +9538,7 @@ function createTimelineItem(p){
 
   delBtn.className = "icon-btn icon-delete";
 
-  delBtn.innerHTML = ICON_X;
+  appendStaticHTML(delBtn, ICON_X);
 
   delBtn.title = "Delete";
 
@@ -9907,17 +9915,13 @@ details.className = "item-details";
 
 
 if (p.comments) {
-
-const comments = document.createElement("span");
-
-comments.className = "detail";
-
-comments.innerHTML = `<em>Comments:</em> ${escapeHtml(p.comments)}`;
-
-
-
-details.appendChild(comments);
-
+  const comments = document.createElement("span");
+  comments.className = "detail";
+  const em = document.createElement("em");
+  em.textContent = "Comments:";
+  comments.appendChild(em);
+  comments.appendChild(document.createTextNode(` ${String(p.comments)}`));
+  details.appendChild(comments);
 }
 
 
@@ -10253,7 +10257,7 @@ function renderBadgesInto(card, codes){
 
   const wrap = card.querySelector(".badge-wrap");
 
-  wrap.innerHTML = "";  // reset (we'll rebuild)
+  clearElement(wrap);  // reset (we'll rebuild)
 
     codes.forEach(code=>{
 
@@ -10284,7 +10288,7 @@ function renderBadgesInto(card, codes){
       const x=document.createElement("button");
       x.type="button";
       x.className="icon-btn icon-delete";
-      x.innerHTML=ICON_X;
+      appendStaticHTML(x, ICON_X);
       x.title="Remove from correlation";
       x.style.marginLeft="4px";
       x.addEventListener("click", (e)=>{
@@ -10377,7 +10381,7 @@ function createCorrelationCard(entry){
 
   const actions=document.createElement("div"); actions.className="item-actions";
 
-  const delBtn=document.createElement("button"); delBtn.type="button"; delBtn.className="icon-btn icon-delete"; delBtn.innerHTML=ICON_X; delBtn.title="Delete correlation";
+  const delBtn=document.createElement("button"); delBtn.type="button"; delBtn.className="icon-btn icon-delete"; appendStaticHTML(delBtn, ICON_X); delBtn.title="Delete correlation";
 
   delBtn.addEventListener("click", ()=>{ openConfirm("Delete this correlation?", ()=>{ card.remove(); dirty=true; requestAutoSyncSave(); }); });
 
@@ -11381,7 +11385,8 @@ const state=gatherStateFromDOM();
 
 const types=["India","Echo","AIS","Alpha","November","Golf"];
 
-const present=types.filter(t=> (state.columns[t]||[]).length>0);
+const extraTypes = Object.keys(state.columns || {}).filter(t => !types.includes(t) && (state.columns[t]||[]).length>0);
+const present = types.filter(t=> (state.columns[t]||[]).length>0).concat(extraTypes);
 
 
 
@@ -11427,311 +11432,322 @@ Object.keys(correlationMap).forEach(code => {
 
 });
 
-
-
-const style = `body{font-family:Arial,sans-serif;margin:0;background:#f5f7fb;color:#111}
-
+const doc = win.document;
+const head = doc.head || doc.createElement("head");
+if(!doc.head){
+  doc.documentElement.insertBefore(head, doc.documentElement.firstChild || null);
+}
+clearElement(head);
+const metaEl = doc.createElement("meta");
+metaEl.setAttribute("charset","utf-8");
+head.appendChild(metaEl);
+const styleEl = doc.createElement("style");
+styleEl.textContent = `body{font-family:Arial,sans-serif;margin:0;background:#f5f7fb;color:#111}
 header{position:sticky;top:0;background:#fff;border-bottom:1px solid #ddd;padding:10px 12px;display:flex;justify-content:space-between;align-items:center}
-
 .muted{color:#666}
-
 .wrap{padding:12px}
-
 .cbrow{display:flex;gap:12px;flex-wrap:wrap;margin:10px 0 14px}
-
 .pill{background:#eef3ff;border:1px solid #c9d8ff;border-radius:999px;padding:4px 10px}
-
 button{padding:6px 10px;border:none;background:#007bff;color:#fff;border-radius:6px;cursor:pointer}
-
 button:hover{background:#0056b3}
-
 .tbl{width:100%;border-collapse:collapse;background:#fff;margin-top:10px}
-
 .tbl th,.tbl td{border:1px solid #e5e7eb;padding:6px 8px;font-size:13px;text-align:left}
-
 .tbl th{background:#f7faff}`;
-
-
-
-// build the checkbox HTML safely as strings
-
-const cbHtml = present
-
-  .map(t => `<label><input type="checkbox" class="typeCb" value="${t}" checked> ${t}</label>`)
-
-  .join(" ");
-
-
-
-const alsoHtml = `<label><input type="checkbox" id="incCrew" checked> Crew Details</label>`;
-
-
-
-
-
-win.document.open();
-
-win.document.write(`<!doctype html><html><head><title>Export CSV</title><meta charset="utf-8"><style>${style}</style></head><body>
-
-<header><div><strong>Export CSV</strong> <span class="pill">Active only</span></div><div class="muted">${new Date().toLocaleString()}</div></header>
-
-<div class="wrap">
-
-
-
-<div><strong>Include TACREP types:</strong></div>
-
-<div class="cbrow">${cbHtml || '<span class="muted">No TACREPs</span>'}</div>
-
-<div><strong>Also include:</strong></div>
-
-<div class="cbrow">${alsoHtml}</div>
-
-<button id="btnGen">Generate CSV</button>
-
-
-
-  <h3 style="margin:14px 0 6px;">TACREPs</h3>
-
-  <table class="tbl" id="previewTR"><thead><tr>
-
-    <th>Code</th><th>Type</th><th>TimeZ</th><th>Vessel</th><th>Sensor</th><th>Pos</th><th>Course</th><th>Speed</th><th>Track</th><th>MinLen(ft)</th><th>Info</th><th>By</th><th>Correlations</th>
-
-  </tr></thead><tbody id="rowsTR"></tbody></table>
-
-
-
-  <h3 style="margin:14px 0 6px;">Crew Details</h3>
-
-  
-
-  <table class="tbl" id="previewCDMeta"><tbody id="rowsCDMeta"></tbody></table> <table class="tbl" id="previewCD"><thead><tr> <th>Shift</th><th>Turnover</th><th>MC</th><th>TC</th><th>UAC</th><th>MPO1</th><th>MPO2</th> </tr></thead><tbody id="rowsCD"></tbody></table>
-
-  <div id="crewMetaWrap" style="margin:6px 0 10px;"> <div id="metaCallsign" class="muted"></div> <div id="metaMission" class="muted"></div> <div id="metaBlockStart" class="muted"></div> </div>
-
-  <table class="tbl" id="previewCD"><thead><tr>
-
-        <th>Shift</th><th>Turnover</th><th>MC</th><th>TC</th><th>UAC</th><th>MPO1</th><th>MPO2</th>
-
-
-
-  </tr></thead><tbody id="rowsCD"></tbody></table>
-
-</div>
-
-
-
-<script>
-
-  const state = ${JSON.stringify(state)};
-
-  const codeToGroups = ${JSON.stringify(correlationMap)};
-
-
-
-
-
-  function d(s){ return String(s||'').replace(/\D/g,''); }
-
-  function buildPos(p){
-
-    if (p && typeof p.positionFmt === 'string' && p.positionFmt) return p.positionFmt;
-
-    function fmt(minStr,decStr){ const mm=d(minStr); const dec=d(decStr||''); const num=mm===''?0:Number(mm); const dn=dec===''?0:Number('0.'+dec); const total=num+dn; return total.toFixed(3).padStart(6, total<10?'0':''); }
-
-    const latD=d(p.latDeg), latM=d(p.latMin), lonD=d(p.lonDeg), lonM=d(p.lonMin);
-
-    if(latD===''||latM===''||!p.latHem||lonD===''||lonM===''||!p.lonHem) return '';
-
-    const latDStr=String(Math.trunc(Number(latD)||0)).padStart(2,'0');
-
-    const lonDStr=String(Math.trunc(Number(lonD)||0)).padStart(3,'0');
-
-    const latMStr=fmt(p.latMin,p.latDecMinStr), lonMStr=fmt(p.lonMin,p.lonDecMinStr);
-
-    return latDStr + ':' + latMStr + (p.latHem || '') + ', ' + lonDStr + ':' + lonMStr + (p.lonHem || '');
-
-  }
-
-
-
-  function selectedTypes(){ return Array.from(document.querySelectorAll('.typeCb')).filter(cb=>cb.checked).map(cb=>cb.value); }
-
-  function corrStringFor(code){
-
-    const arr = codeToGroups[code] || [];
-
-    if (!arr.length) return '';
-
-    return arr.join(', ');
-
-  }
-
-
-
-  // ----- Build & render TACREPs
-
-  function buildRowsTR(){
-
-    const types=selectedTypes(); const rowsEl=document.getElementById('rowsTR'); rowsEl.innerHTML='';
-
-    const out=[];
-
-    ['India','Echo','AIS','Alpha','November','Golf'].forEach(type=>{
-
-      if(!types.includes(type)) return;
-
-      (state.columns[type]||[]).forEach(p=>{
-
-        const corr = corrStringFor(p.code);
-
-        const row=[p.code,type,p.timeHHMM||'',p.vesselType||'',p.sensor||'',buildPos(p),p.course||'',p.speed||'',p.trackNumber||'',p.minVesselLen||'',p.info||'',p.createdBy||'',corr];
-
-        out.push(row);
-
-        const tr=document.createElement('tr');
-
-        row.forEach(cell=>{ const td=document.createElement('td'); td.textContent=String(cell); tr.appendChild(td); });
-
-        rowsEl.appendChild(tr);
-
-      });
-
-    });
-
-    return out;
-
-  }
-
-
-
-  function buildRowsCD(){
-
-    const rowsEl=document.getElementById('rowsCD'); rowsEl.innerHTML='';
-
-    const shifts=(state.crewDetails && Array.isArray(state.crewDetails.shifts)) ? state.crewDetails.shifts : [];
-
-    const out=[];
-
-    for(let i=0;i<shifts.length;i++){
-
-      const s=shifts[i]||{};
-
-      const row=[ 'Shift '+(i+1), s.turnover||'', s.mc||'', s.tc||'', s.uac||'', s.mpo1||'', s.mpo2||'' ];
-
-      out.push(row);
-
-      const tr=document.createElement('tr');
-
-      row.forEach(cell=>{ const td=document.createElement('td'); td.textContent=String(cell); tr.appendChild(td); });
-
-      rowsEl.appendChild(tr);
-
-    }
-
-    return out;
-
-  }
-
-
-
-  function toCSV(rows){
-
-    const esc=v=>/[",\n]/.test(String(v))? '"'+String(v).replace(/"/g,'""')+'"' : String(v);
-
-    return rows.map(r=>r.map(esc).join(',')).join('\n');
-
-  }
-
-
-
-  function sectionCSV(title, header, rows){
-
-    const lines=[];
-
-    lines.push(toCSV([[title]]));
-
-    lines.push(toCSV([header]));
-
-    if(rows.length) lines.push(toCSV(rows));
-
-    lines.push(''); // blank line between sections
-
-    return lines.join('\n');
-
-  }
-
-
-
-  function buildAllPreviews(){
-
-    const includeCD = document.getElementById('incCrew').checked;
-
-    const trRows = buildRowsTR();
-    const cdRows = includeCD ? buildRowsCD() : [];
-
-    const cdMeta = document.getElementById('previewCDMeta');
-    if (cdMeta) cdMeta.style.display = includeCD ? '' : 'none';
-    const cdTable = document.getElementById('previewCD');
-    if (cdTable) cdTable.style.display = includeCD ? '' : 'none';
-
-    return { trRows, cdRows, includeCD };
-
-  }
-
-  document.querySelectorAll('.typeCb').forEach(cb=> cb.addEventListener('change', buildAllPreviews));
-
-  document.getElementById('incCrew').addEventListener('change', buildAllPreviews);
-
-
-
-  document.getElementById('btnGen').addEventListener('click', ()=>{
-
-    const { trRows, cdRows, includeCD } = buildAllPreviews();
-
-    const parts=[];
-
-    parts.push(sectionCSV('TACREPS', ["Code","Type","TimeZ","Vessel","Sensor","Pos","Course","Speed","Track","MinLen(ft)","Info","By","Correlations"], trRows));
-
-    if(includeCD){
-
-        // Add single-line meta above the Crew Details section (no Block Start)
-
-  parts.push(toCSV([["Callsign", (state.crewDetails && state.crewDetails.callsign) || ""]]));
-
-  parts.push(toCSV([["Mission Number", (state.crewDetails && state.crewDetails.missionNumber) || ""]]));
-
-  parts.push("");
-
-  parts.push(sectionCSV('CREW DETAILS', ["Shift","Turnover","MC","TC","UAC","MPO1","MPO2"], cdRows));
-
-
-
-    }
-
-
-
-    const csv = parts.join('\n');
-
-    const blob=new Blob([csv],{type:'text/csv'});
-
-    const url=URL.createObjectURL(blob);
-
-    const a=document.createElement('a'); a.href=url; a.download='warfighter_export.csv'; a.click(); URL.revokeObjectURL(url);
-
+head.appendChild(styleEl);
+doc.title = "Export CSV";
+
+const body = doc.body || doc.createElement("body");
+if(!doc.body){
+  doc.documentElement.appendChild(body);
+}
+clearElement(body);
+
+const headerEl = doc.createElement("header");
+const headerLeft = doc.createElement("div");
+const headerTitle = doc.createElement("strong");
+headerTitle.textContent = "Export CSV";
+const headerPill = doc.createElement("span");
+headerPill.className = "pill";
+headerPill.textContent = "Active only";
+headerLeft.appendChild(headerTitle);
+headerLeft.appendChild(doc.createTextNode(" "));
+headerLeft.appendChild(headerPill);
+const headerRight = doc.createElement("div");
+headerRight.className = "muted";
+headerRight.textContent = new Date().toLocaleString();
+headerEl.appendChild(headerLeft);
+headerEl.appendChild(headerRight);
+body.appendChild(headerEl);
+
+const wrap = doc.createElement("div");
+wrap.className = "wrap";
+body.appendChild(wrap);
+
+const includeLabel = doc.createElement("div");
+const includeStrong = doc.createElement("strong");
+includeStrong.textContent = "Include TACREP types:";
+includeLabel.appendChild(includeStrong);
+wrap.appendChild(includeLabel);
+
+const typeRow = doc.createElement("div");
+typeRow.className = "cbrow";
+wrap.appendChild(typeRow);
+
+const appendCheckboxLabel = (container, text, options={})=>{
+  const label = doc.createElement("label");
+  const input = doc.createElement("input");
+  input.type = "checkbox";
+  if(options.className) input.className = options.className;
+  if(options.id) input.id = options.id;
+  if(options.value) input.value = options.value;
+  if(options.checked !== undefined) input.checked = options.checked;
+  label.appendChild(input);
+  label.appendChild(doc.createTextNode(` ${text}`));
+  container.appendChild(label);
+  return input;
+};
+
+const typeInputs = [];
+if(present.length){
+  present.forEach(t => {
+    typeInputs.push(appendCheckboxLabel(typeRow, t, { className:"typeCb", value:t, checked:true }));
   });
+} else {
+  const span = doc.createElement("span");
+  span.className = "muted";
+  span.textContent = "No TACREPs";
+  typeRow.appendChild(span);
+}
+
+const alsoLabel = doc.createElement("div");
+const alsoStrong = doc.createElement("strong");
+alsoStrong.textContent = "Also include:";
+alsoLabel.appendChild(alsoStrong);
+wrap.appendChild(alsoLabel);
+
+const alsoRow = doc.createElement("div");
+alsoRow.className = "cbrow";
+wrap.appendChild(alsoRow);
+
+const incCrewInput = appendCheckboxLabel(alsoRow, "Crew Details", { id:"incCrew", checked:true });
+
+const btnGen = doc.createElement("button");
+btnGen.id = "btnGen";
+btnGen.textContent = "Generate CSV";
+wrap.appendChild(btnGen);
+
+const addTableWithHeader = (title, headers, tableId, bodyId)=>{
+  const heading = doc.createElement("h3");
+  heading.style.margin = "14px 0 6px";
+  heading.textContent = title;
+  wrap.appendChild(heading);
+  const table = doc.createElement("table");
+  table.className = "tbl";
+  table.id = tableId;
+  const thead = doc.createElement("thead");
+  const tr = doc.createElement("tr");
+  headers.forEach(hText => {
+    const th = doc.createElement("th");
+    th.textContent = hText;
+    tr.appendChild(th);
+  });
+  thead.appendChild(tr);
+  table.appendChild(thead);
+  const tbody = doc.createElement("tbody");
+  tbody.id = bodyId;
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  return tbody;
+};
+
+const rowsTRBody = addTableWithHeader("TACREPs", ["Code","Type","TimeZ","Vessel","Sensor","Pos","Course","Speed","Track","MinLen(ft)","Info","By","Correlations"], "previewTR", "rowsTR");
+
+const crewHeading = doc.createElement("h3");
+crewHeading.style.margin = "14px 0 6px";
+crewHeading.textContent = "Crew Details";
+wrap.appendChild(crewHeading);
+
+const metaTable = doc.createElement("table");
+metaTable.className = "tbl";
+metaTable.id = "previewCDMeta";
+const rowsCDMetaBody = doc.createElement("tbody");
+rowsCDMetaBody.id = "rowsCDMeta";
+metaTable.appendChild(rowsCDMetaBody);
+wrap.appendChild(metaTable);
+
+const crewMetaWrap = doc.createElement("div");
+crewMetaWrap.id = "crewMetaWrap";
+crewMetaWrap.style.margin = "6px 0 10px";
+wrap.appendChild(crewMetaWrap);
+const metaCallsign = doc.createElement("div");
+metaCallsign.id = "metaCallsign";
+metaCallsign.className = "muted";
+crewMetaWrap.appendChild(metaCallsign);
+const metaMission = doc.createElement("div");
+metaMission.id = "metaMission";
+metaMission.className = "muted";
+crewMetaWrap.appendChild(metaMission);
+const metaBlockStart = doc.createElement("div");
+metaBlockStart.id = "metaBlockStart";
+metaBlockStart.className = "muted";
+crewMetaWrap.appendChild(metaBlockStart);
+
+const rowsCDBody = addTableWithHeader("", ["Shift","Turnover","MC","TC","UAC","MPO1","MPO2"], "previewCD", "rowsCD");
+
+const appendRowLocal = (tbody, cells)=>{
+  const tr = doc.createElement("tr");
+  cells.forEach(value => {
+    const tdEl = doc.createElement("td");
+    tdEl.textContent = value == null ? "" : String(value);
+    tr.appendChild(tdEl);
+  });
+  tbody.appendChild(tr);
+};
+
+const dLocal = s => String(s||'').replace(/\D/g,'');
+const buildPosLocal = (p)=>{
+  if (p && typeof p.positionFmt === 'string' && p.positionFmt) return p.positionFmt;
+  const fmt=(minStr,decStr)=>{
+    const mm=dLocal(minStr);
+    const dec=dLocal(decStr||'');
+    const num=mm===''?0:Number(mm);
+    const dn=dec===''?0:Number('0.'+dec);
+    const total=num+dn;
+    return total.toFixed(3).padStart(6,total<10?'0':'');
+  };
+  const latD=dLocal(p.latDeg), latM=dLocal(p.latMin), lonD=dLocal(p.lonDeg), lonM=dLocal(p.lonMin);
+  if(latD===''||latM===''||!p.latHem||lonD===''||lonM===''||!p.lonHem) return '';
+  const latDStr=String(Math.trunc(Number(latD)||0)).padStart(2,'0');
+  const lonDStr=String(Math.trunc(Number(lonD)||0)).padStart(3,'0');
+  const latMStr=fmt(p.latMin,p.latDecMinStr), lonMStr=fmt(p.lonMin,p.lonDecMinStr);
+  return `${latDStr}:${latMStr}${p.latHem || ''}, ${lonDStr}:${lonMStr}${p.lonHem || ''}`;
+};
+
+const selectedTypesLocal = ()=> Array.from(doc.querySelectorAll('.typeCb')).filter(cb=>cb.checked).map(cb=>cb.value);
+const corrStringForLocal = code => {
+  const arr = correlationMap[code] || [];
+  return arr.length ? arr.join(", ") : "";
+};
+
+const orderedTypes = (()=> {
+  const order = ["India","Echo","AIS","Alpha","November","Golf","Other"];
+  const custom = Object.keys(state.columns || {}).filter(t => !order.includes(t));
+  return order.concat(custom);
+})();
+
+const populateMeta = ()=> {
+  clearElement(rowsCDMetaBody);
+  appendRowLocal(rowsCDMetaBody, ["Callsign", (state.crewDetails && state.crewDetails.callsign) || ""]);
+  appendRowLocal(rowsCDMetaBody, ["Mission Number", (state.crewDetails && state.crewDetails.missionNumber) || ""]);
+  metaCallsign.textContent = `Callsign: ${(state.crewDetails && state.crewDetails.callsign) || ""}`;
+  metaMission.textContent = `Mission Number: ${(state.crewDetails && state.crewDetails.missionNumber) || ""}`;
+  metaBlockStart.textContent = `Block Start: ${Number.isInteger(blockStartNum) ? blockStartNum : "--"}`;
+};
+
+const buildRowsTRLocal = ()=> {
+  const typesSelected = selectedTypesLocal();
+  clearElement(rowsTRBody);
+  const out = [];
+  orderedTypes.forEach(type => {
+    if(!typesSelected.includes(type)) return;
+    (state.columns[type] || []).forEach(p=>{
+      const row = [
+        p.code,
+        type,
+        p.timeHHMM || "",
+        p.vesselType || "",
+        p.sensor || "",
+        buildPosLocal(p),
+        p.course || "",
+        p.speed || "",
+        p.trackNumber || "",
+        p.minVesselLen || "",
+        p.info || "",
+        p.createdBy || "",
+        corrStringForLocal(p.code)
+      ];
+      out.push(row);
+      appendRowLocal(rowsTRBody, row);
+    });
+  });
+  return out;
+};
+
+const buildRowsCDLocal = ()=> {
+  clearElement(rowsCDBody);
+  const shifts = (state.crewDetails && Array.isArray(state.crewDetails.shifts)) ? state.crewDetails.shifts : [];
+  const out = [];
+  shifts.forEach((s, idx)=>{
+    const row = [
+      `Shift ${idx+1}`,
+      s?.turnover || "",
+      s?.mc || "",
+      s?.tc || "",
+      s?.uac || "",
+      s?.mpo1 || "",
+      s?.mpo2 || ""
+    ];
+    out.push(row);
+    appendRowLocal(rowsCDBody, row);
+  });
+  return out;
+};
+
+const toCSVLocal = rows => {
+  const esc = v => /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g,'""')}"` : String(v);
+  return rows.map(r=> r.map(esc).join(",")).join("\n");
+};
+
+const sectionCSVLocal = (title, header, rows)=> {
+  const lines = [];
+  lines.push(toCSVLocal([[title]]));
+  lines.push(toCSVLocal([header]));
+  if(rows.length) lines.push(toCSVLocal(rows));
+  lines.push("");
+  return lines.join("\n");
+};
+
+const buildAllPreviewsLocal = ()=> {
+  populateMeta();
+  const includeCrew = incCrewInput.checked;
+  const trRows = buildRowsTRLocal();
+  const cdRows = includeCrew ? buildRowsCDLocal() : [];
+  const metaTable = doc.getElementById("previewCDMeta");
+  if(metaTable) metaTable.style.display = includeCrew ? "" : "none";
+  const crewTable = doc.getElementById("previewCD");
+  if(crewTable) crewTable.style.display = includeCrew ? "" : "none";
+  if(crewMetaWrap) crewMetaWrap.style.display = includeCrew ? "" : "none";
+  return { trRows, cdRows, includeCrew };
+};
+
+const regenerate = ()=>{ buildAllPreviewsLocal(); };
+typeInputs.forEach(cb => cb.addEventListener("change", regenerate));
+incCrewInput.addEventListener("change", regenerate);
+
+btnGen.addEventListener("click", ()=>{
+  const { trRows, cdRows, includeCrew } = buildAllPreviewsLocal();
+  const sections = [];
+  sections.push(sectionCSVLocal("TACREPS", ["Code","Type","TimeZ","Vessel","Sensor","Pos","Course","Speed","Track","MinLen(ft)","Info","By","Correlations"], trRows));
+  if(includeCrew){
+    sections.push(toCSVLocal([["Callsign", (state.crewDetails && state.crewDetails.callsign) || ""]]));
+    sections.push(toCSVLocal([["Mission Number", (state.crewDetails && state.crewDetails.missionNumber) || ""]]));
+    sections.push("");
+    sections.push(sectionCSVLocal("CREW DETAILS", ["Shift","Turnover","MC","TC","UAC","MPO1","MPO2"], cdRows));
+  }
+  const csv = sections.join("\n");
+  const blob = new Blob([csv], { type:"text/csv" });
+  const url = URL.createObjectURL(blob);
+  const link = doc.createElement("a");
+  link.href = url;
+  link.download = "warfighter_export.csv";
+  link.click();
+  URL.revokeObjectURL(url);
+});
+
+buildAllPreviewsLocal();
 
 
 
-  buildAllPreviews();
-
-<\/script></body></html>`);
-
-
-
-
-
-win.document.close();
 
 }
 
