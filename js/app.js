@@ -116,6 +116,71 @@
 
   }
 
+  // ---- Turnover time enforcement ----
+  const TURNOVER_TIME_PATTERN = /^(?:[01]\d|2[0-3])[0-5]\d$/;
+  const TURNOVER_INVALID_MESSAGE = "Enter HHMM between 0000 and 2359.";
+
+  function sanitizeTurnoverValue(value){
+    return String(value ?? "").replace(/\D/g,"").slice(0,4);
+  }
+
+  function validateTurnoverOnBlur(input, shouldAnnounce = false){
+    const digits = sanitizeTurnoverValue(input.value);
+    if(input.value !== digits) input.value = digits;
+    if(!digits){
+      input.setCustomValidity("");
+    }else if(digits.length === 4 && TURNOVER_TIME_PATTERN.test(digits)){
+      input.setCustomValidity("");
+    }else{
+      input.setCustomValidity(TURNOVER_INVALID_MESSAGE);
+      if(shouldAnnounce && typeof input.reportValidity === "function"){
+        input.reportValidity();
+      }
+    }
+  }
+
+  function validateTurnoverWhileTyping(input){
+    const digits = sanitizeTurnoverValue(input.value);
+    if(input.value !== digits) input.value = digits;
+    if(!digits || digits.length < 4){
+      input.setCustomValidity("");
+    }else if(TURNOVER_TIME_PATTERN.test(digits)){
+      input.setCustomValidity("");
+    }else{
+      input.setCustomValidity(TURNOVER_INVALID_MESSAGE);
+    }
+  }
+
+  function setupTurnoverInputs(){
+    const fields = document.querySelectorAll(".turnover-input");
+    if(!fields.length) return;
+    fields.forEach(input=>{
+      input.addEventListener("input", ()=>validateTurnoverWhileTyping(input));
+      input.addEventListener("blur", ()=>validateTurnoverOnBlur(input, true));
+      validateTurnoverOnBlur(input);
+    });
+  }
+
+  function assignTurnoverValue(id, value){
+    const input = document.getElementById(id);
+    if(!input) return;
+    input.value = sanitizeTurnoverValue(value);
+    validateTurnoverOnBlur(input);
+  }
+
+  function readTurnoverValue(id){
+    const input = document.getElementById(id);
+    if(!input) return "";
+    const digits = sanitizeTurnoverValue(input.value);
+    return (digits.length === 4 && TURNOVER_TIME_PATTERN.test(digits)) ? digits : "";
+  }
+
+  if(document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", setupTurnoverInputs, { once:true });
+  }else{
+    setupTurnoverInputs();
+  }
+
 
 
   
@@ -3471,13 +3536,17 @@ function openCrewDetailsModal(){
 
   const set = (id, v)=> { const el = document.getElementById(id); if (el) el.value = v || ""; };
 
-  set("cd_s1_turn", s[0]?.turnover); set("cd_s1_mc", s[0]?.mc); set("cd_s1_tc", s[0]?.tc); set("cd_s1_uac", s[0]?.uac); set("cd_s1_sc", s[0]?.sc); set("cd_s1_mpo1", s[0]?.mpo1); set("cd_s1_mpo2", s[0]?.mpo2);
+  assignTurnoverValue("cd_s1_turn", s[0]?.turnover);
+  set("cd_s1_mc", s[0]?.mc); set("cd_s1_tc", s[0]?.tc); set("cd_s1_uac", s[0]?.uac); set("cd_s1_sc", s[0]?.sc); set("cd_s1_mpo1", s[0]?.mpo1); set("cd_s1_mpo2", s[0]?.mpo2);
 
-set("cd_s2_turn", s[1]?.turnover); set("cd_s2_mc", s[1]?.mc); set("cd_s2_tc", s[1]?.tc); set("cd_s2_uac", s[1]?.uac); set("cd_s2_sc", s[1]?.sc); set("cd_s2_mpo1", s[1]?.mpo1); set("cd_s2_mpo2", s[1]?.mpo2);
+  assignTurnoverValue("cd_s2_turn", s[1]?.turnover);
+  set("cd_s2_mc", s[1]?.mc); set("cd_s2_tc", s[1]?.tc); set("cd_s2_uac", s[1]?.uac); set("cd_s2_sc", s[1]?.sc); set("cd_s2_mpo1", s[1]?.mpo1); set("cd_s2_mpo2", s[1]?.mpo2);
 
-set("cd_s3_turn", s[2]?.turnover); set("cd_s3_mc", s[2]?.mc); set("cd_s3_tc", s[2]?.tc); set("cd_s3_uac", s[2]?.uac); set("cd_s3_sc", s[2]?.sc); set("cd_s3_mpo1", s[2]?.mpo1); set("cd_s3_mpo2", s[2]?.mpo2);
+  assignTurnoverValue("cd_s3_turn", s[2]?.turnover);
+  set("cd_s3_mc", s[2]?.mc); set("cd_s3_tc", s[2]?.tc); set("cd_s3_uac", s[2]?.uac); set("cd_s3_sc", s[2]?.sc); set("cd_s3_mpo1", s[2]?.mpo1); set("cd_s3_mpo2", s[2]?.mpo2);
 
-set("cd_s4_turn", s[3]?.turnover); set("cd_s4_mc", s[3]?.mc); set("cd_s4_tc", s[3]?.tc); set("cd_s4_uac", s[3]?.uac); set("cd_s4_sc", s[3]?.sc); set("cd_s4_mpo1", s[3]?.mpo1); set("cd_s4_mpo2", s[3]?.mpo2);
+  assignTurnoverValue("cd_s4_turn", s[3]?.turnover);
+  set("cd_s4_mc", s[3]?.mc); set("cd_s4_tc", s[3]?.tc); set("cd_s4_uac", s[3]?.uac); set("cd_s4_sc", s[3]?.sc); set("cd_s4_mpo1", s[3]?.mpo1); set("cd_s4_mpo2", s[3]?.mpo2);
 
 
 
@@ -3495,13 +3564,13 @@ function onCrewDetailsSave(){
 
     shifts: [
 
-  { turnover:get("cd_s1_turn"), mc:get("cd_s1_mc"), tc:get("cd_s1_tc"), uac:get("cd_s1_uac"), sc:get("cd_s1_sc"), mpo1:get("cd_s1_mpo1"), mpo2:get("cd_s1_mpo2") },
+  { turnover:readTurnoverValue("cd_s1_turn"), mc:get("cd_s1_mc"), tc:get("cd_s1_tc"), uac:get("cd_s1_uac"), sc:get("cd_s1_sc"), mpo1:get("cd_s1_mpo1"), mpo2:get("cd_s1_mpo2") },
 
-  { turnover:get("cd_s2_turn"), mc:get("cd_s2_mc"), tc:get("cd_s2_tc"), uac:get("cd_s2_uac"), sc:get("cd_s2_sc"), mpo1:get("cd_s2_mpo1"), mpo2:get("cd_s2_mpo2") },
+  { turnover:readTurnoverValue("cd_s2_turn"), mc:get("cd_s2_mc"), tc:get("cd_s2_tc"), uac:get("cd_s2_uac"), sc:get("cd_s2_sc"), mpo1:get("cd_s2_mpo1"), mpo2:get("cd_s2_mpo2") },
 
-  { turnover:get("cd_s3_turn"), mc:get("cd_s3_mc"), tc:get("cd_s3_tc"), uac:get("cd_s3_uac"), sc:get("cd_s3_sc"), mpo1:get("cd_s3_mpo1"), mpo2:get("cd_s3_mpo2") },
+  { turnover:readTurnoverValue("cd_s3_turn"), mc:get("cd_s3_mc"), tc:get("cd_s3_tc"), uac:get("cd_s3_uac"), sc:get("cd_s3_sc"), mpo1:get("cd_s3_mpo1"), mpo2:get("cd_s3_mpo2") },
 
-  { turnover:get("cd_s4_turn"), mc:get("cd_s4_mc"), tc:get("cd_s4_tc"), uac:get("cd_s4_uac"), sc:get("cd_s4_sc"), mpo1:get("cd_s4_mpo1"), mpo2:get("cd_s4_mpo2") }
+  { turnover:readTurnoverValue("cd_s4_turn"), mc:get("cd_s4_mc"), tc:get("cd_s4_tc"), uac:get("cd_s4_uac"), sc:get("cd_s4_sc"), mpo1:get("cd_s4_mpo1"), mpo2:get("cd_s4_mpo2") }
 
 ]
 
@@ -3549,13 +3618,17 @@ if (mnEl) mnEl.value = missionNumber || "";
 
 // Shift rows
 
-set("md_cd_s1_turn", s[0]?.turnover); set("md_cd_s1_mc", s[0]?.mc); set("md_cd_s1_tc", s[0]?.tc); set("md_cd_s1_uac", s[0]?.uac); set("md_cd_s1_sc", s[0]?.sc); set("md_cd_s1_mpo1", s[0]?.mpo1); set("md_cd_s1_mpo2", s[0]?.mpo2);
+assignTurnoverValue("md_cd_s1_turn", s[0]?.turnover);
+set("md_cd_s1_mc", s[0]?.mc); set("md_cd_s1_tc", s[0]?.tc); set("md_cd_s1_uac", s[0]?.uac); set("md_cd_s1_sc", s[0]?.sc); set("md_cd_s1_mpo1", s[0]?.mpo1); set("md_cd_s1_mpo2", s[0]?.mpo2);
 
-set("md_cd_s2_turn", s[1]?.turnover); set("md_cd_s2_mc", s[1]?.mc); set("md_cd_s2_tc", s[1]?.tc); set("md_cd_s2_uac", s[1]?.uac); set("md_cd_s2_sc", s[1]?.sc); set("md_cd_s2_mpo1", s[1]?.mpo1); set("md_cd_s2_mpo2", s[1]?.mpo2);
+assignTurnoverValue("md_cd_s2_turn", s[1]?.turnover);
+set("md_cd_s2_mc", s[1]?.mc); set("md_cd_s2_tc", s[1]?.tc); set("md_cd_s2_uac", s[1]?.uac); set("md_cd_s2_sc", s[1]?.sc); set("md_cd_s2_mpo1", s[1]?.mpo1); set("md_cd_s2_mpo2", s[1]?.mpo2);
 
-set("md_cd_s3_turn", s[2]?.turnover); set("md_cd_s3_mc", s[2]?.mc); set("md_cd_s3_tc", s[2]?.tc); set("md_cd_s3_uac", s[2]?.uac); set("md_cd_s3_sc", s[2]?.sc); set("md_cd_s3_mpo1", s[2]?.mpo1); set("md_cd_s3_mpo2", s[2]?.mpo2);
+assignTurnoverValue("md_cd_s3_turn", s[2]?.turnover);
+set("md_cd_s3_mc", s[2]?.mc); set("md_cd_s3_tc", s[2]?.tc); set("md_cd_s3_uac", s[2]?.uac); set("md_cd_s3_sc", s[2]?.sc); set("md_cd_s3_mpo1", s[2]?.mpo1); set("md_cd_s3_mpo2", s[2]?.mpo2);
 
-set("md_cd_s4_turn", s[3]?.turnover); set("md_cd_s4_mc", s[3]?.mc); set("md_cd_s4_tc", s[3]?.tc); set("md_cd_s4_uac", s[3]?.uac); set("md_cd_s4_sc", s[3]?.sc); set("md_cd_s4_mpo1", s[3]?.mpo1); set("md_cd_s4_mpo2", s[3]?.mpo2);
+assignTurnoverValue("md_cd_s4_turn", s[3]?.turnover);
+set("md_cd_s4_mc", s[3]?.mc); set("md_cd_s4_tc", s[3]?.tc); set("md_cd_s4_uac", s[3]?.uac); set("md_cd_s4_sc", s[3]?.sc); set("md_cd_s4_mpo1", s[3]?.mpo1); set("md_cd_s4_mpo2", s[3]?.mpo2);
 
 }
 
@@ -3567,13 +3640,13 @@ return {
 
 shifts: [
 
-{ turnover:get("md_cd_s1_turn"), mc:get("md_cd_s1_mc"), tc:get("md_cd_s1_tc"), uac:get("md_cd_s1_uac"), sc:get("md_cd_s1_sc"), mpo1:get("md_cd_s1_mpo1"), mpo2:get("md_cd_s1_mpo2") },
+{ turnover:readTurnoverValue("md_cd_s1_turn"), mc:get("md_cd_s1_mc"), tc:get("md_cd_s1_tc"), uac:get("md_cd_s1_uac"), sc:get("md_cd_s1_sc"), mpo1:get("md_cd_s1_mpo1"), mpo2:get("md_cd_s1_mpo2") },
 
-{ turnover:get("md_cd_s2_turn"), mc:get("md_cd_s2_mc"), tc:get("md_cd_s2_tc"), uac:get("md_cd_s2_uac"), sc:get("md_cd_s2_sc"), mpo1:get("md_cd_s2_mpo1"), mpo2:get("md_cd_s2_mpo2") },
+{ turnover:readTurnoverValue("md_cd_s2_turn"), mc:get("md_cd_s2_mc"), tc:get("md_cd_s2_tc"), uac:get("md_cd_s2_uac"), sc:get("md_cd_s2_sc"), mpo1:get("md_cd_s2_mpo1"), mpo2:get("md_cd_s2_mpo2") },
 
-{ turnover:get("md_cd_s3_turn"), mc:get("md_cd_s3_mc"), tc:get("md_cd_s3_tc"), uac:get("md_cd_s3_uac"), sc:get("md_cd_s3_sc"), mpo1:get("md_cd_s3_mpo1"), mpo2:get("md_cd_s3_mpo2") },
+{ turnover:readTurnoverValue("md_cd_s3_turn"), mc:get("md_cd_s3_mc"), tc:get("md_cd_s3_tc"), uac:get("md_cd_s3_uac"), sc:get("md_cd_s3_sc"), mpo1:get("md_cd_s3_mpo1"), mpo2:get("md_cd_s3_mpo2") },
 
-{ turnover:get("md_cd_s4_turn"), mc:get("md_cd_s4_mc"), tc:get("md_cd_s4_tc"), uac:get("md_cd_s4_uac"), sc:get("md_cd_s4_sc"), mpo1:get("md_cd_s4_mpo1"), mpo2:get("md_cd_s4_mpo2") }
+{ turnover:readTurnoverValue("md_cd_s4_turn"), mc:get("md_cd_s4_mc"), tc:get("md_cd_s4_tc"), uac:get("md_cd_s4_uac"), sc:get("md_cd_s4_sc"), mpo1:get("md_cd_s4_mpo1"), mpo2:get("md_cd_s4_mpo2") }
 
 ]
 
@@ -8746,7 +8819,7 @@ function findDeletedElementByCode(code){
 
           separator.className = "history-separator";
 
-          separator.textContent = "? Changes from older version highlighted above";
+          separator.textContent = "Changes from older version highlighted above";
 
           content.appendChild(separator);
 
