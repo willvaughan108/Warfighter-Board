@@ -2315,8 +2315,9 @@ const timelineItems = (function(){
 
 
 timelineItems.forEach(p=>{
-  const lat = formatDmsString(p.latDeg, p.latMin, p.latSec, p.latDecSecStr, p.latHem) || "";
-  const lon = formatDmsString(p.lonDeg, p.lonMin, p.lonSec, p.lonDecSecStr, p.lonHem) || "";
+  const manualPosition = typeof p.position === "string" ? p.position.trim() : "";
+  const lat = manualPosition || formatDmsString(p.latDeg, p.latMin, p.latSec, p.latDecSecStr, p.latHem) || "";
+  const lon = manualPosition ? "" : (formatDmsString(p.lonDeg, p.lonMin, p.lonSec, p.lonDecSecStr, p.lonHem) || "");
 
   timelineRows.push([
     p.timeHHMM||"",
@@ -5634,6 +5635,38 @@ if (onDeckBtn) {
 
 }
 
+const opsNormalBtn = document.getElementById("mtl_OPSNORMAL");
+
+if (opsNormalBtn) {
+
+  opsNormalBtn.addEventListener("click", ()=> {
+
+    document.getElementById("opsNormalTitle").textContent = "New OPSNORMAL Report";
+
+    [
+      "opsNormalTime",
+      "opsLatDeg","opsLatMin","opsLatSec","opsLatDecSec",
+      "opsLonDeg","opsLonMin","opsLonSec","opsLonDecSec",
+      "opsNormalAltitude"
+    ].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = "";
+    });
+
+    const latHem = document.getElementById("opsLatHem");
+    if (latHem) latHem.value = "N";
+
+    const lonHem = document.getElementById("opsLonHem");
+    if (lonHem) lonHem.value = "E";
+
+    window._editingOpsNormalItem = null;
+
+    openModal(document.getElementById("opsNormalModal"));
+
+  });
+
+}
+
 
 
 const timelineFaultBtn = document.getElementById("mtl_FAULTS");
@@ -5695,6 +5728,203 @@ if (missionLogBtn) {
     window._editingMissionLogItem = null;
 
     openModal(document.getElementById("missionLogModal"));
+
+  });
+
+}
+
+
+
+const opsNormalTimeCurrentBtn = document.getElementById("opsNormalTimeCurrent");
+
+if (opsNormalTimeCurrentBtn) {
+
+  opsNormalTimeCurrentBtn.addEventListener("click", ()=> {
+
+    const d = new Date();
+
+    document.getElementById("opsNormalTime").value = `${pad2(d.getUTCHours())}${pad2(d.getUTCMinutes())}`;
+
+  });
+
+}
+
+
+
+const opsNormalCancelBtn = document.getElementById("opsNormalCancel");
+
+if (opsNormalCancelBtn) {
+
+  opsNormalCancelBtn.addEventListener("click", ()=> {
+
+    window._editingOpsNormalItem = null;
+
+    closeModal(document.getElementById("opsNormalModal"));
+
+  });
+
+}
+
+
+
+const opsNormalForm = document.getElementById("opsNormalForm");
+
+if (opsNormalForm) {
+
+  function toDecMinStr(minStr, secStr, decSecStr){
+    const mm = Number(minStr||"0");
+    const ss = Number(secStr||"0");
+    const ds = Number(("0."+(decSecStr||"0")).slice(0,4));
+    const total = mm + (ss + ds)/60;
+    const whole = Math.floor(total);
+    const frac  = total - whole;
+    return String(Math.round(frac*1e8)).padStart(8,"0").replace(/0+$/,"");
+  }
+
+  opsNormalForm.addEventListener("submit", (e)=> {
+
+    e.preventDefault();
+
+    const timeVal = (document.getElementById("opsNormalTime").value || "").trim().replace(/\D/g,"").slice(0,4);
+
+    if (!timeVal || timeVal.length !== 4) {
+
+      alert("Enter time in HHMM Zulu.");
+
+      return;
+
+    }
+
+    const hh = Number(timeVal.slice(0,2));
+
+    const mm = Number(timeVal.slice(2,4));
+
+    if (hh > 23 || mm > 59) {
+
+      alert("Invalid time. Hours must be 0-23 and minutes must be 0-59.");
+
+      return;
+
+    }
+
+    const latDegStr    = (document.getElementById("opsLatDeg").value || "").replace(/\D/g,"");
+    const latMinStr    = (document.getElementById("opsLatMin").value || "").replace(/\D/g,"");
+    const latSecStr    = (document.getElementById("opsLatSec").value || "").replace(/\D/g,"").slice(0,2);
+    const latDecSecStr = (document.getElementById("opsLatDecSec").value || "").replace(/\D/g,"").slice(0,2);
+    const latHem       = (document.getElementById("opsLatHem").value || "N");
+
+    const lonDegStr    = (document.getElementById("opsLonDeg").value || "").replace(/\D/g,"");
+    const lonMinStr    = (document.getElementById("opsLonMin").value || "").replace(/\D/g,"");
+    const lonSecStr    = (document.getElementById("opsLonSec").value || "").replace(/\D/g,"").slice(0,2);
+    const lonDecSecStr = (document.getElementById("opsLonDecSec").value || "").replace(/\D/g,"").slice(0,2);
+    const lonHem       = (document.getElementById("opsLonHem").value || "E");
+
+    const latProvided = (latDegStr !== "" && latMinStr !== "");
+    const lonProvided = (lonDegStr !== "" && lonMinStr !== "");
+
+    if (!latProvided || !lonProvided) {
+      alert("Enter both latitude and longitude for the OPSNORMAL report.");
+      return;
+    }
+
+    const latDeg=Number(latDegStr), latMin=Number(latMinStr), latSec=Number(latSecStr);
+    const lonDeg=Number(lonDegStr), lonMin=Number(lonMinStr), lonSec=Number(lonSecStr);
+
+    const invalidLat = (latDegStr!=="" || latMinStr!=="" || latSecStr!=="") &&
+      (!Number.isFinite(latDeg)||latDeg<0||latDeg>90 ||
+       !Number.isFinite(latMin)||latMin<0||latMin>=60 ||
+       !Number.isFinite(latSec)||latSec<0||latSec>=60);
+
+    const invalidLon = (lonDegStr!=="" || lonMinStr!=="" || lonSecStr!=="") &&
+      (!Number.isFinite(lonDeg)||lonDeg<0||lonDeg>180 ||
+       !Number.isFinite(lonMin)||lonMin<0||lonMin>=60 ||
+       !Number.isFinite(lonSec)||lonSec<0||lonSec>=60);
+
+    if(invalidLat || invalidLon){
+      alert("Check Position:\n- Lat: 0-90 deg, 0-59', 0-59.99\" \n- Lon: 0-180 deg, 0-59', 0-59.99\"");
+      return;
+    }
+
+    const latDecMinStr = toDecMinStr(latMinStr, latSecStr, latDecSecStr);
+    const lonDecMinStr = toDecMinStr(lonMinStr, lonSecStr, lonDecSecStr);
+
+    const altitudeVal = (document.getElementById("opsNormalAltitude").value || "").trim();
+
+    const now = Date.now();
+
+    if (window._editingOpsNormalItem) {
+
+      const existing = JSON.parse(window._editingOpsNormalItem.dataset.payload || "{}");
+
+      const payload = {
+
+        ...existing,
+
+        timeHHMM: timeVal,
+
+        type: "OPSNORMAL",
+
+        latDeg: latDegStr, latMin: latMinStr, latSec: latSecStr, latDecSecStr, latDecMinStr, latHem,
+        lonDeg: lonDegStr, lonMin: lonMinStr, lonSec: lonSecStr, lonDecSecStr, lonDecMinStr, lonHem,
+
+        altitude: altitudeVal,
+
+        lastModified: now
+
+      };
+
+      delete payload.position;
+
+      updateTimelineItem(window._editingOpsNormalItem, payload);
+
+      window._editingOpsNormalItem = null;
+
+      dirty = true;
+
+      requestAutoSyncSave(true);
+
+      showBanner("OPSNORMAL entry updated.");
+
+    } else {
+
+      const payload = {
+
+        timeHHMM: timeVal,
+
+        type: "OPSNORMAL",
+
+        latDeg: latDegStr, latMin: latMinStr, latSec: latSecStr, latDecSecStr, latDecMinStr, latHem,
+        lonDeg: lonDegStr, lonMin: lonMinStr, lonSec: lonSecStr, lonDecSecStr, lonDecMinStr, lonHem,
+
+        altitude: altitudeVal,
+
+        createdBy: crewPosition || "",
+
+        createdAt: now,
+
+        lastModified: now
+
+      };
+
+      const list = document.getElementById("missionTimelineItems");
+
+      if (list) {
+
+        const el = createTimelineItem(payload);
+
+        insertTimelineItemSorted(list, el);
+
+      }
+
+      dirty = true;
+
+      requestAutoSyncSave(true);
+
+      showBanner("OPSNORMAL entry added.");
+
+    }
+
+    closeModal(document.getElementById("opsNormalModal"));
 
   });
 
@@ -6594,6 +6824,16 @@ clampDigitsInput(document.getElementById("osLonMin"));
 clampDigitsInput(document.getElementById("osLonSec"), 2);
 
 clampDigitsInput(document.getElementById("osLonDecSec"), 2);
+
+clampDigitsInput(document.getElementById("opsNormalTime"));
+clampDigitsInput(document.getElementById("opsLatDeg"));
+clampDigitsInput(document.getElementById("opsLatMin"));
+clampDigitsInput(document.getElementById("opsLatSec"), 2);
+clampDigitsInput(document.getElementById("opsLatDecSec"), 2);
+clampDigitsInput(document.getElementById("opsLonDeg"));
+clampDigitsInput(document.getElementById("opsLonMin"));
+clampDigitsInput(document.getElementById("opsLonSec"), 2);
+clampDigitsInput(document.getElementById("opsLonDecSec"), 2);
 
 clampDigitsInput(document.getElementById("odTime"));
 
@@ -9176,6 +9416,7 @@ window._timelineEntryType = "ONSTA";
 window._editingTimelineFaultItem = null;
 
 window._editingTimelineRepinItem = null;
+window._editingOpsNormalItem = null;
 
 
 
@@ -9385,9 +9626,9 @@ function updateTimelineItem(item, payload){
 
       parts.push(`Airfield: ${next.airfield}`);
 
-    } else if (next.type === "ONSTA" || next.type === "OFFSTA") {
+    } else if (next.type === "ONSTA" || next.type === "OFFSTA" || next.type === "OPSNORMAL") {
 
-      const posStr = buildPosDisplay(next);
+      const posStr = buildPosDisplay(next) || (next.position ? String(next.position) : "");
 
       if (posStr) parts.push(`Pos: ${posStr}`);
 
@@ -9445,9 +9686,9 @@ function updateTimelineItem(item, payload){
 
     details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Airfield:</em> ${escapeHtml(next.airfield)}</span>`);
 
-  } else if (next.type === "ONSTA" || next.type === "OFFSTA") {
+  } else if (next.type === "ONSTA" || next.type === "OFFSTA" || next.type === "OPSNORMAL") {
 
-    const posStr = buildPosDisplay(next);
+    const posStr = buildPosDisplay(next) || (next.position ? String(next.position) : "");
 
     if (posStr) details.insertAdjacentHTML("beforeend", `<span class="detail"><em>Pos:</em> ${escapeHtml(posStr)}</span>`);
 
@@ -9518,6 +9759,8 @@ function createTimelineItem(p){
   p.type === "FAULT"      ? "TIMELINE_FAULT" :
 
   p.type === "REPIN"      ? "TIMELINE_REPIN" :
+
+  p.type === "OPSNORMAL"  ? "TIMELINE_OPSNORMAL" :
 
   "TIMELINE_GENERIC"
 
@@ -9740,6 +9983,30 @@ openModal(document.getElementById("onStaModal"));
   window._editingMissionLogItem = item;
 
   openModal(document.getElementById("missionLogModal"));
+
+} else if (payload.type === "OPSNORMAL") {
+
+  document.getElementById("opsNormalTitle").textContent = "Edit OPSNORMAL Report";
+
+  document.getElementById("opsNormalTime").value = payload.timeHHMM || "";
+
+  document.getElementById("opsLatDeg").value = payload.latDeg || "";
+  document.getElementById("opsLatMin").value = payload.latMin || "";
+  document.getElementById("opsLatSec").value = payload.latSec || "";
+  document.getElementById("opsLatDecSec").value = payload.latDecSecStr || "";
+  document.getElementById("opsLatHem").value = payload.latHem || "N";
+
+  document.getElementById("opsLonDeg").value = payload.lonDeg || "";
+  document.getElementById("opsLonMin").value = payload.lonMin || "";
+  document.getElementById("opsLonSec").value = payload.lonSec || "";
+  document.getElementById("opsLonDecSec").value = payload.lonDecSecStr || "";
+  document.getElementById("opsLonHem").value = payload.lonHem || "E";
+
+  document.getElementById("opsNormalAltitude").value = payload.altitude || "";
+
+  window._editingOpsNormalItem = item;
+
+  openModal(document.getElementById("opsNormalModal"));
 
 } else if (payload.type === "FAULT") {
 
@@ -11338,15 +11605,25 @@ correlationCancelBtn.addEventListener("click", ()=> setSelectMode(false));
 
 
 
+  function manualPositionValue(p){
+    if (!p || typeof p !== "object") return "";
+    const raw = typeof p.position === "string" ? p.position.trim() : "";
+    return raw;
+  }
+
+
+
   function formatPositionWithFormat(p, formatOverride){
 
     const fmt = sanitizePositionFormat(formatOverride) || positionFormat;
+
+    const manual = manualPositionValue(p);
 
     if (fmt === "MGRS") {
 
       const coords = getDecimalLatLon(p);
 
-      if (!coords) return "";
+      if (!coords) return manual;
 
       return latLonToMGRS(coords.lat, coords.lon);
 
@@ -11358,11 +11635,13 @@ correlationCancelBtn.addEventListener("click", ()=> setSelectMode(false));
 
       if (coords) return formatDMmPair(coords.lat, coords.lon);
 
-      return formatDMmFromPartsFallback(p);
+      const fallback = formatDMmFromPartsFallback(p);
+
+      return fallback || manual;
 
     }
 
-    if (!coords) return "";
+    if (!coords) return manual;
 
     switch (fmt) {
 
