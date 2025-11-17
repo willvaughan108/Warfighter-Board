@@ -66,6 +66,7 @@
   <button id="settingsBtn" class="icon-btn" title="Open Settings">⚙</button>
   <button id="suggestionBtn" title="Open Suggestion Box">Suggestion Box</button>
    <button id="exportBtn" title="Export CSV of TACREPs">Export CSV</button>
+    <button id="exportWordBtn" title="Export Word doc of TACREPs">Export to WordDoc</button>
     <button id="syncSaveBtn" title="Save your changes and merge with the file on disk">Sync &amp; Save</button>
     <button id="downloadJsonBtn" style="display:none;" title="Download current mission as JSON">Download JSON</button>
     <span id="fileStatus" class="muted">No file</span>
@@ -219,6 +220,7 @@
           <div class="mtl-controls row tight" style="gap:8px;">
             <button type="button" id="mtl_OFFDECK">OFFDECK</button>
             <button type="button" id="mtl_ONSTA">ONSTA</button>
+            <button type="button" id="mtl_OPSNORMAL">OPSNORMAL</button>
             <button type="button" id="mtl_OFFSTA">OFFSTA</button>
             <button type="button" id="mtl_ONDECK">ONDECK</button>
           </div>
@@ -807,6 +809,54 @@
       <div class="actions" style="margin-top:12px;">
         <button id="mlCancel" type="button" class="btn-secondary">Cancel</button>
         <button id="mlSave" type="submit">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- OPSNORMAL Modal -->
+<div id="opsNormalModal" class="modal" aria-hidden="true">
+  <div class="content" role="dialog" aria-modal="true" aria-labelledby="opsNormalTitle">
+    <h3 id="opsNormalTitle">OPSNORMAL Report</h3>
+    <form id="opsNormalForm">
+      <label for="opsNormalTime">Time (Zulu)</label>
+      <div class="row tight" style="gap:8px;">
+        <input id="opsNormalTime" type="text" placeholder="HHMM" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required>
+        <button id="opsNormalTimeCurrent" type="button" class="btn-secondary">Current</button>
+      </div>
+
+      <label>Latitude (DA&deg; M' S.SS")</label>
+      <div class="row tight">
+        <input type="text" id="opsLatDeg" placeholder="Deg" inputmode="numeric" maxlength="2">
+        <input type="text" id="opsLatMin" placeholder="Min" inputmode="numeric" maxlength="2">
+        <input type="text" id="opsLatSec" placeholder="Sec" inputmode="numeric" maxlength="2">
+        <span class="dot" aria-hidden="true">.</span>
+        <input type="text" id="opsLatDecSec" placeholder="Dec Sec" inputmode="numeric" maxlength="2">
+        <select id="opsLatHem">
+          <option value="N">N</option>
+          <option value="S">S</option>
+        </select>
+      </div>
+
+      <label>Longitude (DA&deg; M' S.SS")</label>
+      <div class="row tight">
+        <input type="text" id="opsLonDeg" placeholder="Deg" inputmode="numeric" maxlength="3">
+        <input type="text" id="opsLonMin" placeholder="Min" inputmode="numeric" maxlength="2">
+        <input type="text" id="opsLonSec" placeholder="Sec" inputmode="numeric" maxlength="2">
+        <span class="dot" aria-hidden="true">.</span>
+        <input type="text" id="opsLonDecSec" placeholder="Dec Sec" inputmode="numeric" maxlength="2">
+        <select id="opsLonHem">
+          <option value="E">E</option>
+          <option value="W">W</option>
+        </select>
+      </div>
+
+      <label for="opsNormalAltitude">Altitude</label>
+      <input id="opsNormalAltitude" type="text" placeholder="e.g., 25000">
+
+      <div class="actions" style="margin-top:12px;">
+        <button id="opsNormalCancel" type="button" class="btn-secondary">Cancel</button>
+        <button id="opsNormalSave" type="submit">Save</button>
       </div>
     </form>
   </div>

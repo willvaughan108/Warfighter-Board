@@ -2201,65 +2201,11 @@ try {
 
 
 
+
   // ---- UI helpers ----
 
-function openExportPreview(){
-
-
-
-
-const groups = new Map(); // type -> { headers, rows }
-const correlationLookup = buildCorrelationLookup();
-
-document.querySelectorAll('.column[data-column]:not([data-column="Deleted"]):not([data-column="History"]):not([data-column="Correlations"]):not([data-column="MissionDetails"]):not([data-column="MissionTimeline"]) .item').forEach(it=>{
-
-try{
-
-const p = JSON.parse(it.dataset.payload || "{}");
-
-if(!p || !p.code) return; // only export real TACREPs
-
-
-
-  const t = tacrepTypeFromCode(p.code);
-
-  const labels = getTacrepFieldLabels(t, true);
-
-  const headers = ["Code"].concat(labels, ["Correlations","CreatedBy","CreatedAt"]);
-
-  const row = [p.code || ""]
-
-    .concat(getTacrepFieldValues(t, p))
-
-    .concat([
-
-      formatCorrelationCell(p.code, correlationLookup),
-      p.createdBy || "",
-
-      p.createdAt ? new Date(p.createdAt).toISOString() : ""
-
-    ]);
-
-
-
-  if (!groups.has(t)) groups.set(t, { headers, rows: [] });
-
-  const bucket = groups.get(t);
-
-  bucket.headers = headers;
-
-  bucket.rows.push(row);
-
-}catch{}
-
-
-
-
-
-});
-
-
-
+const EXPORT_TYPE_ORDER = ["India","Echo","AIS","Alpha","November","Golf","Other"];
+const EXPORT_TIMELINE_HEADER = ["","Time","Type","Airfield","Lat","Lon","Altitude","CreatedBy","CreatedAt"];
 
 function formatCorrelationCell(code, lookup){
   const arr = lookup[code] || [];
@@ -2282,57 +2228,118 @@ function buildCorrelationLookup(){
   return out;
 }
 
-// Build Mission Timeline rows (defensive)
+function collectExportData(){
+  const groups = new Map(); // type -> { headers, rows }
+  const correlationLookup = buildCorrelationLookup();
 
-const timelineHeader = ["","Time","Type","Airfield","Lat","Lon","Altitude","CreatedBy","CreatedAt"];
+  document.querySelectorAll('.column[data-column]:not([data-column="Deleted"]):not([data-column="History"]):not([data-column="Correlations"]):not([data-column="MissionDetails"]):not([data-column="MissionTimeline"]) .item').forEach(it=>{
+    try{
+      const p = JSON.parse(it.dataset.payload || "{}");
+      if(!p || !p.code) return; // only export real TACREPs
 
-const timelineRows = [];
+      const t = tacrepTypeFromCode(p.code);
+      const labels = getTacrepFieldLabels(t, true);
+      const headers = ["Code"].concat(labels, ["Correlations","CreatedBy","CreatedAt"]);
+      const row = [p.code || ""]
+        .concat(getTacrepFieldValues(t, p))
+        .concat([
+          formatCorrelationCell(p.code, correlationLookup),
+          p.createdBy || "",
+          p.createdAt ? new Date(p.createdAt).toISOString() : ""
+        ]);
 
-
-
-// Safely obtain timeline entries even if gatherStateFromDOM is missing
-
-const timelineItems = (function(){
-
-  try {
-
-    const s = (typeof gatherStateFromDOM === "function") ? gatherStateFromDOM() : null;
-
-    if (s && Array.isArray(s.missionTimeline)) return s.missionTimeline;
-
-  } catch {}
-
-  // Fallback: read from DOM
-
-  return Array.from(document.querySelectorAll("#missionTimelineItems .item")).map(el => {
-
-    try { return JSON.parse(el.dataset.payload || "{}"); } catch { return {}; }
-
+      if (!groups.has(t)) groups.set(t, { headers, rows: [] });
+      const bucket = groups.get(t);
+      bucket.headers = headers;
+      bucket.rows.push(row);
+    }catch{}
   });
 
-})();
+  const timelineRows = [];
 
+  const timelineItems = (function(){
+    try {
+      const s = (typeof gatherStateFromDOM === "function") ? gatherStateFromDOM() : null;
+      if (s && Array.isArray(s.missionTimeline)) return s.missionTimeline;
+    } catch {}
+    // Fallback: read from DOM
+    return Array.from(document.querySelectorAll("#missionTimelineItems .item")).map(el => {
+      try { return JSON.parse(el.dataset.payload || "{}"); } catch { return {}; }
+    });
+  })();
 
+  timelineItems.forEach(p=>{
+    const manualPosition = typeof p.position === "string" ? p.position.trim() : "";
+    const lat = manualPosition || formatDmsString(p.latDeg, p.latMin, p.latSec, p.latDecSecStr, p.latHem) || "";
+    const lon = manualPosition ? "" : (formatDmsString(p.lonDeg, p.lonMin, p.lonSec, p.lonDecSecStr, p.lonHem) || "");
 
-timelineItems.forEach(p=>{
-  const manualPosition = typeof p.position === "string" ? p.position.trim() : "";
-  const lat = manualPosition || formatDmsString(p.latDeg, p.latMin, p.latSec, p.latDecSecStr, p.latHem) || "";
-  const lon = manualPosition ? "" : (formatDmsString(p.lonDeg, p.lonMin, p.lonSec, p.lonDecSecStr, p.lonHem) || "");
+    timelineRows.push([
+      p.timeHHMM||"",
+      p.type||"",
+      p.airfield||"",
+      (p.type === "REPIN" ? (p.associatedFault || "") : (p.fault || "")),
+      lat,
+      lon,
+      p.altitude||"",
+      p.createdBy||"",
+      p.createdAt ? new Date(p.createdAt).toISOString() : ""
+    ]);
+  });
 
-  timelineRows.push([
-    p.timeHHMM||"",
-    p.type||"",
-    p.airfield||"",
-    (p.type === "REPIN" ? (p.associatedFault || "") : (p.fault || "")),
-    lat,
-    lon,
-    p.altitude||"",
-    p.createdBy||"",
-    p.createdAt ? new Date(p.createdAt).toISOString() : ""
-  ]);
+  const ordered = EXPORT_TYPE_ORDER.filter(t => groups.has(t));
+  const remaining = Array.from(groups.keys()).filter(t => !EXPORT_TYPE_ORDER.includes(t));
+  const allTypes = ordered.concat(remaining);
 
-});
+  const allCsvRows = [];
+  allCsvRows.push(["MissionDetails"]);
+  allCsvRows.push(["","Callsign", typeof callsign === "string" ? callsign : ""]);
+  allCsvRows.push(["","MissionNumber", typeof missionNumber === "string" ? missionNumber : ""]);
+  allCsvRows.push([]);
 
+  allCsvRows.push(["Crew Details"]);
+  allCsvRows.push(["","","Turnover","MC","TC","UAC","SC","MPO1","MPO2"]);
+  ((crewDetails && Array.isArray(crewDetails.shifts)) ? crewDetails.shifts : []).forEach((s, idx) => {
+    const label = ["Shift 1","Shift 2","Shift 3","Shift 4"][idx] || `Shift ${idx+1}`;
+    allCsvRows.push([
+      "",
+      label,
+      s?.turnover || "",
+      s?.mc || "",
+      s?.tc || "",
+      s?.uac || "",
+      s?.sc || "",
+      s?.mpo1 || "",
+      s?.mpo2 || ""
+    ]);
+  });
+  allCsvRows.push([]);
+
+  allCsvRows.push(["Tacreps"]);
+  allTypes.forEach(t => {
+    const { headers, rows } = groups.get(t);
+    allCsvRows.push([t]);                         // keep section title in column A
+    allCsvRows.push([""].concat(headers));        // headers start in column B
+    rows.forEach(r => allCsvRows.push([""].concat(r))); // data start in column B
+
+    allCsvRows.push([]);          // spacer between type sections
+  });
+
+  allCsvRows.push(["MissionTimeline"]);
+  allCsvRows.push(EXPORT_TIMELINE_HEADER);
+  timelineRows.forEach(r => allCsvRows.push(r));
+
+  const csv = allCsvRows
+    .map(row =>
+      row.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")
+    )
+    .join("\n");
+
+  return { groups, allTypes, timelineRows, timelineHeader: EXPORT_TIMELINE_HEADER, csv };
+}
+
+function openExportPreview(){
+
+const { groups, allTypes, timelineRows, csv } = collectExportData();
 
 
 
@@ -2376,16 +2383,6 @@ if (crewBody) {
 const container = document.getElementById("exportTacrepsGrouped");
 
 if (container) clearElement(container);
-
-const ORDER = ["India","Echo","AIS","Alpha","November","Golf","Other"];
-
-const ordered = ORDER.filter(t => groups.has(t));
-
-const remaining = Array.from(groups.keys()).filter(t => !ORDER.includes(t));
-
-const allTypes = ordered.concat(remaining);
-
-
 
 if (container){
 
@@ -2439,8 +2436,6 @@ container.appendChild(tbl);
 
 
 
-// Render Mission Timeline preview (existing table body)
-
 const $t2 = document.getElementById("exportBodyTimeline");
 
 if ($t2) clearElement($t2);
@@ -2455,116 +2450,6 @@ timelineRows.forEach(r=>{
 
 
 
-// Build CSV exactly like the Excel picture
-
-const allCsvRows = [];
-
-
-
-/* MissionDetails -- title row, then two key/value rows (no BlockStart here) */
-
-allCsvRows.push(["MissionDetails"]);
-
-allCsvRows.push(["","Callsign", typeof callsign === "string" ? callsign : ""]);
-
-allCsvRows.push(["","MissionNumber", typeof missionNumber === "string" ? missionNumber : ""]);
-
-allCsvRows.push([]);
-
-
-
-/* Crew Details -- title row, then header starting in column B */
-
-allCsvRows.push(["Crew Details"]);
-
-allCsvRows.push(["","","Turnover","MC","TC","UAC","SC","MPO1","MPO2"]);
-
-( (crewDetails && Array.isArray(crewDetails.shifts)) ? crewDetails.shifts : [] )
-
-  .forEach((s, idx) => {
-
-    const label = ["Shift 1","Shift 2","Shift 3","Shift 4"][idx] || `Shift ${idx+1}`;
-
-    allCsvRows.push([
-
-      "",
-
-      label,
-
-      s?.turnover || "",
-
-      s?.mc || "",
-
-      s?.tc || "",
-
-      s?.uac || "",
-
-      s?.sc || "",
-
-      s?.mpo1 || "",
-
-      s?.mpo2 || ""
-
-    ]);
-
-  });
-
-allCsvRows.push([]);
-
-
-
-/* Tacreps -- add a top-level title row, then each type as its own section */
-
-allCsvRows.push(["Tacreps"]);
-
-allTypes.forEach(t => {
-
-  const { headers, rows } = groups.get(t);
-
- allCsvRows.push([t]);                         // keep section title in column A
-
-allCsvRows.push([""].concat(headers));        // headers start in column B
-
-rows.forEach(r => allCsvRows.push([""].concat(r))); // data start in column B
-
-
-
-  allCsvRows.push([]);          // spacer between type sections
-
-});
-
-
-
-/* MissionTimeline -- title row, then header row (not combined) */
-
-allCsvRows.push(["MissionTimeline"]);
-
-allCsvRows.push(timelineHeader);
-
-timelineRows.forEach(r => allCsvRows.push(r));
-
-
-
-/* (the csv = ... code that follows stays the same) */
-
-
-
-const csv = allCsvRows
-
-  .map(row =>
-
-    row.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")
-
-  )
-
-  .join("\n");
-
-
-
-
-
-// Prepare download URL
-
 if (exportCsvUrl){ try{ URL.revokeObjectURL(exportCsvUrl); }catch{} }
 
 const blob = new Blob([csv], { type:"text/csv" });
@@ -2572,8 +2457,6 @@ const blob = new Blob([csv], { type:"text/csv" });
 exportCsvUrl = URL.createObjectURL(blob);
 
 
-
-// Wire modal buttons
 
 const modal = document.getElementById("exportModal");
 
@@ -2613,12 +2496,61 @@ openModal(modal);
 
 }
 
+function exportWordDoc(){
+  const { groups, allTypes, timelineRows, timelineHeader } = collectExportData();
+  const safe = v => escapeHtml(String(v ?? ""));
 
+  const parts = [];
+  const styles = "body{font-family:Arial, sans-serif;} table{border-collapse:collapse;width:100%;margin-top:6px;} th,td{border:1px solid #000;padding:4px;font-size:12px;text-align:left;} h2,h3{margin:12px 0 6px;} .section{margin-bottom:14px;}";
+  parts.push(`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${styles}</style></head><body>`);
 
+  const addTable = (title, headers, rows)=>{
+    parts.push(`<div class="section"><h3>${safe(title)}</h3><table><thead><tr>`);
+    headers.forEach(h=> parts.push(`<th>${safe(h)}</th>`));
+    parts.push("</tr></thead><tbody>");
+    rows.forEach(row=>{
+      parts.push("<tr>");
+      row.forEach(cell=> parts.push(`<td>${safe(cell)}</td>`));
+      parts.push("</tr>");
+    });
+    parts.push("</tbody></table></div>");
+  };
 
+  addTable("Mission Details", ["Field","Value"], [
+    ["Callsign", typeof callsign === "string" ? callsign : ""],
+    ["Mission Number", typeof missionNumber === "string" ? missionNumber : ""]
+  ]);
 
+  const crewRows = ((crewDetails && Array.isArray(crewDetails.shifts)) ? crewDetails.shifts : []).map((s, idx)=>[
+    ["Shift 1","Shift 2","Shift 3","Shift 4"][idx] || `Shift ${idx+1}`,
+    s?.turnover || "",
+    s?.mc || "",
+    s?.tc || "",
+    s?.uac || "",
+    s?.sc || "",
+    s?.mpo1 || "",
+    s?.mpo2 || ""
+  ]);
+  addTable("Crew Details", ["Shift","Turnover","MC","TC","UAC","SC","MPO1","MPO2"], crewRows);
 
+  allTypes.forEach(t=>{
+    const bucket = groups.get(t);
+    if (!bucket) return;
+    addTable(`TACREPs - ${t}`, bucket.headers || [], bucket.rows || []);
+  });
 
+  addTable("Mission Timeline", timelineHeader, timelineRows);
+
+  parts.push("</body></html>");
+
+  const blob = new Blob(parts, { type:"application/msword" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "warfighter_export.doc";
+  a.click();
+  setTimeout(()=>{ try{ URL.revokeObjectURL(url); }catch{} }, 1000);
+}
   function openModal(m){ if(!m) return; m.style.display="flex"; m.setAttribute("aria-hidden","false"); }
 
   function closeModal(m){ if(!m) return; m.style.display="none"; m.setAttribute("aria-hidden","true"); }
@@ -4095,6 +4027,7 @@ renderTacrepDetailsInto = function(item, payload) {
 
 
  $("#exportBtn").addEventListener("click", openExportPreview);
+ $("#exportWordBtn")?.addEventListener("click", exportWordDoc);
 
     $("#downloadJsonBtn").addEventListener("click", downloadCurrentJSON);
 
