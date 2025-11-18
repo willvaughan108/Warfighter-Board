@@ -294,3 +294,20 @@ grid-template-columns: 90px repeat(7, minmax(120px, 1fr));
 #echoPositionDynamic:not(.active){display:none;}
 #echoPositionDynamic .echo-pos-block{display:none;}
 #echoPositionDynamic .echo-pos-block.echo-pos-active{display:block;}
+
+/* Primary Tasking button state colors */
+.primary-tasking-btn,
+.primary-tasking-btn.primary-tasking-empty {
+  background: var(--danger);
+  color: #fff;
+}
+.primary-tasking-btn:hover,
+.primary-tasking-btn.primary-tasking-empty:hover {
+  background: var(--dangerH);
+}
+.primary-tasking-btn.primary-tasking-filled {
+  background: var(--ok);
+}
+.primary-tasking-btn.primary-tasking-filled:hover {
+  background: var(--okH);
+}

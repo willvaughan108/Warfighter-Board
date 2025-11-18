@@ -293,6 +293,8 @@ function nextHighest(prefix, columnName){
 
   let missionNumber = "";
 
+  let primaryTasking = "";
+
   let crewDetails = mkCrewDetailsDefaults();
 
   let reportedFlag = false; // form-level flag synced with change-type toggle
@@ -3633,6 +3635,44 @@ fillCrewDetailsTileFromState();
 
 }
 
+function updatePrimaryTaskingButtons(hasTextOverride){
+  const hasText = (typeof hasTextOverride === "boolean") ? hasTextOverride : !!(primaryTasking && primaryTasking.trim());
+  document.querySelectorAll(".primary-tasking-btn").forEach(btn=>{
+    btn.classList.toggle("primary-tasking-filled", hasText);
+    btn.classList.toggle("primary-tasking-empty", !hasText);
+  });
+}
+
+function syncPrimaryTaskingInput(){
+  const input = document.getElementById("primaryTaskingInput");
+  if (input) input.value = primaryTasking || "";
+  updatePrimaryTaskingButtons();
+}
+
+function openPrimaryTaskingModal(){
+  syncPrimaryTaskingInput();
+  openModal($("#primaryTaskingModal"));
+}
+
+function savePrimaryTasking(){
+  const input = document.getElementById("primaryTaskingInput");
+  const next = input ? input.value : "";
+  const changed = next !== primaryTasking;
+  primaryTasking = next;
+  syncPrimaryTaskingInput();
+  closeModal($("#primaryTaskingModal"));
+  if (changed){
+    dirty = true;
+    requestAutoSyncSave(true);
+    showBanner("Primary tasking saved.");
+  }
+}
+
+function cancelPrimaryTasking(){
+  syncPrimaryTaskingInput();
+  closeModal($("#primaryTaskingModal"));
+}
+
   function updateFileStatus(){
 
     if(memoryMode){
@@ -4266,6 +4306,23 @@ if(mdCdSave){ mdCdSave.addEventListener("click", onCrewDetailsTileSave); }
 const mdCdCancel = document.getElementById("md_cdCancel");
 
 if(mdCdCancel){ mdCdCancel.addEventListener("click", resetCrewDetailsTile); }
+
+document.querySelectorAll(".primary-tasking-btn").forEach(btn=>{
+  btn.addEventListener("click", openPrimaryTaskingModal);
+});
+
+const primaryTaskingCancelBtn = document.getElementById("primaryTaskingCancel");
+if (primaryTaskingCancelBtn) primaryTaskingCancelBtn.addEventListener("click", cancelPrimaryTasking);
+
+const primaryTaskingSaveBtn = document.getElementById("primaryTaskingSave");
+if (primaryTaskingSaveBtn) primaryTaskingSaveBtn.addEventListener("click", savePrimaryTasking);
+
+const primaryTaskingInput = document.getElementById("primaryTaskingInput");
+if (primaryTaskingInput) {
+  primaryTaskingInput.addEventListener("input", ()=> updatePrimaryTaskingButtons(!!primaryTaskingInput.value.trim()));
+}
+
+syncPrimaryTaskingInput();
 
 fillCrewDetailsTileFromState();
 
@@ -7773,6 +7830,8 @@ blockStartNum,
 
 missionNumber,
 
+primaryTasking,
+
 columns:{ India:[], Echo:[], AIS:[], Alpha:[], November:[], Golf:[] },
 
 correlations:[],
@@ -7985,6 +8044,9 @@ if (typeof state.missionNumber === "string") {
 
 }
 
+primaryTasking = (typeof state.primaryTasking === "string") ? state.primaryTasking : "";
+syncPrimaryTaskingInput();
+
 // reflect in the Mission Details tile in case columns haven't forced a refresh yet
 
 if (state.callsign || state.missionNumber) {
@@ -8058,6 +8120,8 @@ blockStartNum,
 callsign,
 
 missionNumber,
+
+primaryTasking,
 
 columns: {},
 

@@ -7,7 +7,7 @@
 <!-- REGION:settings-json START -->
 <script id="settings-json" type="application/json">
 {
-  "version": "v1.0",
+  "version": "v1.1",
   "emailDomain": "us.navy.mil",
   "abbrevDefaults": ["time","vesselType","sensor"],
   "abbrevMax": 3,
@@ -30,7 +30,7 @@
 
 <section id="landing">
   <h1 class="landing-warning">NOT APPROVED FOR USE</h1>
-  <h1 class="brand-title">TacDesk <span class="ver" id="versionA">v1.0</span></h1>
+  <h1 class="brand-title">TacDesk <span class="ver" id="versionA">v1.1</span></h1>
   <div class="landing-buttons">
     <button id="btnLandingNew" type="button">New Mission</button>
     <button id="btnLandingCollab" type="button" class="btn-secondary">Collaborate</button>
@@ -42,7 +42,7 @@
 <!-- REGION:app START -->
 <section id="app" aria-hidden="true">
   <h1 class="landing-warning">NOT APPROVED FOR USE</h1>
-  <h1>TacDesk <span class="ver" id="versionB">v1.0</span></h1>
+  <h1>TacDesk <span class="ver" id="versionB">v1.1</span></h1>
 
   <div class="timebar" aria-live="polite">
     <span id="dateLocal">Sep 23</span><span class="sep">|</span>
@@ -151,6 +151,8 @@
         <input id="md_cd_s4_mpo2"  type="text" placeholder="MPO2"        aria-labelledby="md_hdr_mpo2 md_row_s4">
       </div>
     </div>
+
+    <button id="primaryTaskingBtn" class="btn-secondary primary-tasking-btn" type="button" style="margin-top:12px;">Primary Tasking</button>
 
     <div class="actions" style="margin-top:12px;">
       <button id="md_cdCancel" class="btn-secondary" type="button">Cancel</button>
@@ -332,6 +334,18 @@
     <div class="actions">
       <button id="blockCancel" class="btn-secondary" type="button">Cancel</button>
       <button id="blockApply" type="button">Apply</button>
+    </div>
+  </div>
+</div>
+
+<div id="primaryTaskingModal" class="modal" aria-hidden="true">
+  <div class="content" role="dialog" aria-modal="true" aria-labelledby="primaryTaskingTitle">
+    <h3 id="primaryTaskingTitle">Primary Tasking</h3>
+    <label for="primaryTaskingInput">Primary Tasking</label>
+    <textarea id="primaryTaskingInput" rows="4" placeholder="Enter primary tasking..."></textarea>
+    <div class="actions" style="margin-top:12px;">
+      <button id="primaryTaskingCancel" class="btn-secondary" type="button">Cancel</button>
+      <button id="primaryTaskingSave" type="button">Save</button>
     </div>
   </div>
 </div>
@@ -739,6 +753,8 @@
         <input id="cd_s4_mpo2"  type="text" placeholder="MPO2"        aria-labelledby="hdr_mpo2 row_s4">
       </div>
     </div>
+
+    <button id="primaryTaskingModalBtn" class="btn-secondary primary-tasking-btn" type="button" style="margin-top:12px;">Primary Tasking</button>
 
     <div class="actions" style="margin-top:12px;">
       <button id="cdCancel" class="btn-secondary" type="button">Cancel</button>
